@@ -1191,6 +1191,29 @@ const TEAMS = [
   { id: 'LV-03', name: 'LV-03 Gleidson',    color: '#7eff6b', metaDiaria: 3500 },
   { id: 'LV-04', name: 'LV-04 Marcos Pinto',color: '#ffcc00', metaDiaria: 3500 },
 ];
+
+// Retorna a meta diária de uma equipe para uma data específica (YYYY-MM-DD ou mes/ano)
+function getMetaDiaria(teamId, anoMes) {
+  // anoMes pode ser: 'YYYY-MM-DD', 'YYYY-MM' ou número do mês (1-12)
+  let ano = 0, mes = 0;
+  if (typeof anoMes === 'string' && anoMes.length >= 7) {
+    ano = parseInt(anoMes.slice(0,4));
+    mes = parseInt(anoMes.slice(5,7));
+  } else if (typeof anoMes === 'number') {
+    // só mês, assume ano corrente
+    ano = new Date().getFullYear();
+    mes = anoMes;
+  }
+
+  // LV-02 Mauro: meta passa para R$ 5.500 a partir de março/2026
+  if (teamId === 'LV-02') {
+    if (ano > 2026 || (ano === 2026 && mes >= 3)) return 5500;
+    return 3500;
+  }
+
+  const t = TEAMS.find(t => t.id === teamId);
+  return t ? t.metaDiaria : 0;
+}
 const MONTHS = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 const MONTHS_FULL = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 
@@ -1238,10 +1261,33 @@ function calcularDiasUteisMes(teamId, mesIdx, allRecords) {
 }
 
 // Meta acumulada real de uma equipe num conjunto filtrado
+// Soma metaDiaria de cada dia individualmente (suporta mudança de meta por período)
 function calcularMeta(teamId, recsDoFiltro) {
   const t = TEAMS.find(t => t.id === teamId);
   if (!t) return 0;
-  return t.metaDiaria * calcularDiasUteis(teamId, recsDoFiltro);
+
+  // Dias úteis = trabalhados + parados (sem folga)
+  const diasFolga = new Set(
+    recsDoFiltro
+      .filter(r => r.equipe === teamId && ['F','FOLGA'].includes(String(r.tipo_servico||'').trim().toUpperCase()))
+      .map(r => r.data)
+  );
+  const diasTrab = new Set(
+    recsDoFiltro
+      .filter(r => r.equipe === teamId && !['F','FOLGA'].includes(String(r.tipo_servico||'').trim().toUpperCase()) && r.valor > 0)
+      .map(r => r.data)
+  );
+  const diasParados = new Set(
+    justificativas
+      .filter(j => j.equipe === teamId)
+      .map(j => j.data)
+  );
+  const diasBase = new Set([...diasTrab, ...diasParados]);
+
+  // Soma a meta de cada dia individualmente
+  let total = 0;
+  diasBase.forEach(data => { total += getMetaDiaria(teamId, data); });
+  return total;
 }
 
 // ===========================
@@ -2055,12 +2101,19 @@ function renderEquipes() {
     const recs    = filtered.filter(r => r.equipe === t.id && !['F','FOLGA'].includes(String(r.tipo_servico||'').trim().toUpperCase()));
     const fat     = recs.reduce((s,r)=>s+r.valor,0);
     const os      = recs.filter(r=>isOSValida(r.os)).length;
-    const parados = filtJust.filter(j=>j.equipe===t.id).length;
-    const dias    = [...new Set(recs.filter(r => r.valor > 0).map(r=>r.data))].length;
-    const metaAcum = calcularMeta(t.id, filtered);
-    const perf    = metaAcum > 0 ? Math.min(120, Math.round((fat/metaAcum)*100)) : 0;
-    const perfColor = perf >= 100 ? 'var(--accent3)' : perf >= 75 ? 'var(--accent4)' : 'var(--accent2)';
-    const diasUteis = calcularDiasUteis(t.id, filtered);
+    // Dias trabalhados = dias distintos com valor > 0
+    const diasTrab    = new Set(recs.filter(r => r.valor > 0).map(r=>r.data));
+    // Dias parados = justificativas da equipe (atestados, chuva, etc.)
+    const diasParados = new Set(filtJust.filter(j=>j.equipe===t.id).map(j=>j.data));
+    // Meta = soma da metaDiaria de cada dia individualmente (suporta mudança de meta por período)
+    const diasBase    = new Set([...diasTrab, ...diasParados]);
+    let metaAcum = 0;
+    diasBase.forEach(data => { metaAcum += getMetaDiaria(t.id, data); });
+    const dias    = diasTrab.size;
+    const parados = diasParados.size;
+    const perf       = metaAcum > 0 ? Math.min(120, Math.round((fat/metaAcum)*100)) : 0;
+    const perfColor  = perf >= 100 ? 'var(--accent3)' : perf >= 75 ? 'var(--accent4)' : 'var(--accent2)';
+    const metaDiariaAtual = getMetaDiaria(t.id, new Date().toISOString().slice(0,10));
     return `<div class="kpi-card">
       <div class="kpi-label">${t.name}</div>
       <div class="kpi-value" style="color:${t.color};font-size:22px">R$ ${fmt(fat)}</div>
@@ -2069,10 +2122,10 @@ function renderEquipes() {
         <div style="font-size:10px;color:${perfColor};text-align:right;margin-top:3px;font-family:'JetBrains Mono',monospace">${perf}% da meta — R$ ${fmt(metaAcum)}</div>
       </div>
       <div style="margin-top:10px;display:flex;flex-direction:column;gap:6px">
-        <div class="info-row"><span class="info-key">Meta Diária</span><span class="info-val" style="color:#ff6b35">R$ ${fmt(t.metaDiaria)}</span></div>
+        <div class="info-row"><span class="info-key">Meta Diária</span><span class="info-val" style="color:#ff6b35">R$ ${fmt(metaDiariaAtual)}</span></div>
         <div class="info-row"><span class="info-key">OS Realizadas</span><span class="info-val">${os}</span></div>
         <div class="info-row"><span class="info-key">Dias Trabalhados</span><span class="info-val">${dias}</span></div>
-        <div class="info-row"><span class="info-key">Dias Parados</span><span class="info-val">${parados}</span></div>
+        <div class="info-row"><span class="info-key">Dias Parados</span><span class="info-val" style="color:${parados>0?'var(--accent2)':'inherit'}">${parados}</span></div>
       </div>
     </div>`;
   }).join('');
