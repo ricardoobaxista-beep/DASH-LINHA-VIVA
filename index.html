@@ -2823,14 +2823,14 @@ function parseCancelados(rows) {
 
     if (!rawData) return; // linha sem data, pula
 
-    // Normaliza data
+    // Normaliza data — suporta M/D/YYYY (Google Sheets), DD/MM/YYYY e YYYY-MM-DD
     let dataStr = '';
     if (rawData instanceof Date) {
       dataStr = `${rawData.getFullYear()}-${String(rawData.getMonth()+1).padStart(2,'0')}-${String(rawData.getDate()).padStart(2,'0')}`;
     } else if (typeof rawData === 'number') {
       dataStr = excelSerialToDate(rawData);
     } else {
-      dataStr = normalizeDate(String(rawData));
+      dataStr = normalizeDateGSheets(String(rawData));
     }
     if (!dataStr) return;
 
