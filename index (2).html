@@ -1,0 +1,3569 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Dashboard Linha Viva — Painel de controle de produção, faturamento e equipes">
+<meta name="theme-color" content="#0a0d14">
+<meta name="robots" content="noindex, nofollow">
+<title>Dashboard Linha Viva</title>
+
+<!-- Preconnect para CDNs (carregamento mais rápido) -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://cdnjs.cloudflare.com">
+<link rel="preconnect" href="https://cdn.jsdelivr.net">
+
+<!-- Favicon inline -->
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='16' fill='%230a0d14'/><text y='.9em' font-size='80'>⚡</text></svg>">
+
+<!-- Bibliotecas externas -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=JetBrains+Mono:wght@300;400;500&display=swap');
+
+  :root {
+    --bg: #0a0d14;
+    --surface: #111520;
+    --surface2: #161b28;
+    --border: #1e2840;
+    --accent: #00d4ff;
+    --accent2: #ff6b35;
+    --accent3: #7eff6b;
+    --accent4: #ffcc00;
+    --text: #e8eaf6;
+    --muted: #5a6380;
+    --lv01: #00d4ff;
+    --lv02: #ff6b35;
+    --lv03: #7eff6b;
+    --lv04: #ffcc00;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* SIDEBAR */
+  .sidebar {
+    position: fixed; left: 0; top: 0; bottom: 0;
+    width: 220px;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex; flex-direction: column;
+    z-index: 100;
+    padding: 24px 0;
+  }
+
+  .logo {
+    padding: 0 24px 28px;
+    border-bottom: 1px solid var(--border);
+  }
+  .logo h1 { font-size: 17px; font-weight: 800; line-height: 1.2; }
+  .logo span { color: #ff6b35; }
+
+  .nav { flex: 1; padding: 20px 12px; display: flex; flex-direction: column; gap: 4px; }
+  .nav-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--muted);
+    transition: all 0.2s;
+  }
+  .nav-item:hover { background: var(--surface2); color: var(--text); }
+  .nav-item.active { background: rgba(0,212,255,0.1); color: var(--accent); }
+  .nav-item .icon { font-size: 16px; width: 20px; text-align: center; }
+
+  .nav-section { font-size: 10px; color: var(--muted); letter-spacing: 2px; padding: 16px 12px 6px; font-weight: 600; }
+
+  .teams-badges { padding: 20px 16px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px; }
+  .teams-badges h4 { font-size: 10px; color: var(--muted); letter-spacing: 2px; margin-bottom: 4px; }
+  .team-badge {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 11px; font-weight: 600;
+  }
+  .dot { width: 8px; height: 8px; border-radius: 50%; }
+
+  /* MAIN */
+  .main {
+    margin-left: 220px;
+    min-height: 100vh;
+  }
+
+  .topbar {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 16px 32px;
+    display: flex; align-items: center; justify-content: space-between;
+    position: sticky; top: 0; z-index: 90;
+  }
+  .topbar-left h2 { font-size: 16px; font-weight: 700; }
+  .topbar-left span { font-size: 12px; color: var(--muted); font-family: 'JetBrains Mono', monospace; }
+
+  .topbar-right { display: flex; gap: 12px; align-items: center; }
+
+  .btn {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 12px; font-weight: 600;
+    cursor: pointer; border: none;
+    font-family: 'Syne', sans-serif;
+    transition: all 0.2s;
+  }
+  .btn-primary { background: var(--accent); color: #000; }
+  .btn-primary:hover { background: #00b8e0; transform: translateY(-1px); }
+  .btn-orange { background: #ff6b35; color: #fff; }
+  .btn-orange:hover { background: #e85a25; transform: translateY(-1px); }
+
+  /* BOTÃO SINCRONIZAR GOOGLE SHEETS */
+  .btn-sync {
+    display: inline-flex; align-items: center; gap: 7px;
+    background: linear-gradient(135deg, #1a7f3c, #22a855);
+    color: #fff;
+    border: none; border-radius: 8px;
+    padding: 8px 16px;
+    font-size: 12px; font-weight: 700;
+    font-family: 'Syne', sans-serif;
+    cursor: pointer; letter-spacing: 0.5px;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+  .btn-sync:hover { opacity: 0.88; transform: translateY(-1px); }
+  .btn-sync.syncing { background: linear-gradient(135deg, #0f4d24, #166534); cursor: wait; }
+  .btn-sync.success { background: linear-gradient(135deg, #065f46, #047857); }
+  .btn-sync.error   { background: linear-gradient(135deg, #7f1d1d, #991b1b); }
+
+  /* OVERLAY SYNC */
+  #syncOverlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.75); backdrop-filter: blur(4px);
+    z-index: 9999; align-items: center; justify-content: center;
+  }
+  #syncOverlay.active { display: flex; }
+  .sync-box {
+    background: var(--surface); border: 1px solid #22a855;
+    border-radius: 20px; padding: 36px 48px;
+    text-align: center; min-width: 340px;
+    box-shadow: 0 0 60px rgba(34,168,85,0.2);
+  }
+  .sync-spinner {
+    width: 48px; height: 48px; border: 4px solid rgba(34,168,85,0.2);
+    border-top-color: #22a855; border-radius: 50%;
+    animation: spin 0.8s linear infinite; margin: 0 auto 16px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .sync-title { font-size: 16px; font-weight: 700; color: var(--text); margin-bottom: 6px; }
+  .sync-sub   { font-size: 12px; color: var(--muted); }
+  .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
+  .btn-outline:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-danger { background: rgba(255,59,59,0.15); border: 1px solid rgba(255,59,59,0.3); color: #ff6b6b; }
+
+  .import-area {
+    background: var(--surface);
+    border: 2px dashed var(--border);
+    border-radius: 16px;
+    padding: 40px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s;
+    margin: 32px 32px 0;
+  }
+  .import-area:hover { border-color: var(--accent); background: rgba(0,212,255,0.03); }
+  .import-area.hidden { display: none; }
+  .import-icon { font-size: 40px; margin-bottom: 12px; }
+  .import-area h3 { font-size: 16px; margin-bottom: 8px; }
+  .import-area p { font-size: 13px; color: var(--muted); }
+  #fileInput { display: none; }
+
+  .content { padding: 32px; display: flex; flex-direction: column; gap: 24px; }
+
+  /* KPI CARDS */
+  .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+  .kpi-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px;
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.2s, border-color 0.2s;
+  }
+  .kpi-card:hover { transform: translateY(-2px); border-color: var(--accent); }
+  .kpi-card::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  }
+  .kpi-card:nth-child(1)::before { background: var(--accent); }
+  .kpi-card:nth-child(2)::before { background: var(--accent2); }
+  .kpi-card:nth-child(3)::before { background: var(--accent3); }
+  .kpi-card:nth-child(4)::before { background: var(--accent4); }
+
+  .kpi-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 8px; }
+  .kpi-value { font-size: 28px; font-weight: 800; margin-bottom: 4px; font-family: 'JetBrains Mono', monospace; }
+  .kpi-sub { font-size: 11px; color: var(--muted); }
+  .kpi-trend { position: absolute; right: 20px; top: 20px; font-size: 11px; padding: 3px 8px; border-radius: 20px; font-weight: 600; }
+  .trend-up { background: rgba(126,255,107,0.1); color: var(--accent3); }
+  .trend-down { background: rgba(255,107,53,0.1); color: var(--accent2); }
+
+  /* SECTION HEADER */
+  .section-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 16px;
+  }
+  .section-title { font-size: 14px; font-weight: 700; }
+  .section-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+  /* CHARTS */
+  .charts-row { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; }
+  .chart-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 24px;
+  }
+  .charts-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .charts-row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+
+  canvas { max-height: 260px; }
+
+  /* BOTÃO CAPTURA / PRINT */
+  .btn-capture {
+    display: inline-flex; align-items: center; gap: 5px;
+    background: rgba(0,212,255,0.08);
+    border: 1px solid rgba(0,212,255,0.2);
+    color: rgba(0,212,255,0.7);
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 10px; font-weight: 600;
+    font-family: 'Syne', sans-serif;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .btn-capture:hover {
+    background: rgba(0,212,255,0.18);
+    border-color: rgba(0,212,255,0.5);
+    color: #00d4ff;
+  }
+  .btn-capture.ok {
+    background: rgba(126,255,107,0.12);
+    border-color: rgba(126,255,107,0.4);
+    color: #7eff6b;
+  }
+
+  /* SELETOR DE ABAS */
+  #sheetButtonsRow button {
+    transition: all 0.2s;
+    cursor: pointer;
+  }
+  #sheetButtonsRow button:hover {
+    border-color: var(--accent) !important;
+    background: rgba(0,212,255,0.08) !important;
+    color: var(--accent) !important;
+  }
+
+  /* EXPORTAÇÃO PDF */
+  #pdfOverlay {
+    display: none;
+    position: fixed; inset: 0; z-index: 9999;
+    background: rgba(10,13,20,0.92);
+    backdrop-filter: blur(6px);
+    align-items: center; justify-content: center;
+    flex-direction: column; gap: 20px;
+  }
+  #pdfOverlay.active { display: flex; }
+  #pdfOverlay .pdf-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 40px 48px;
+    text-align: center;
+    min-width: 340px;
+  }
+  #pdfOverlay .pdf-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 18px; font-weight: 700;
+    color: var(--text); margin-bottom: 6px;
+  }
+  #pdfOverlay .pdf-sub { font-size: 13px; color: var(--muted); margin-bottom: 28px; }
+  #pdfProgressBar {
+    width: 100%; height: 6px;
+    background: var(--surface2); border-radius: 3px;
+    overflow: hidden; margin-bottom: 12px;
+  }
+  #pdfProgressFill {
+    height: 100%; width: 0%;
+    background: linear-gradient(90deg, #00d4ff, #7eff6b);
+    border-radius: 3px; transition: width 0.4s ease;
+  }
+  #pdfStep { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--muted); }
+  .btn-pdf {
+    background: linear-gradient(135deg, #a00, #e33);
+    color: #fff; border: none;
+    padding: 10px 18px; border-radius: 8px;
+    font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 700;
+    cursor: pointer; display: inline-flex; align-items: center; gap: 8px;
+    transition: opacity 0.2s;
+  }
+  .btn-pdf:hover { opacity: 0.85; }
+
+  /* TABELA DIÁRIA PRODUÇÃO */
+  .tabela-diaria-wrap {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+  }
+  .tabela-diaria-wrap .table-header {
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .tabela-diaria { width: 100%; border-collapse: collapse; font-size: 11px; }
+  .tabela-diaria thead tr:first-child th {
+    background: #1a2035;
+    text-align: center;
+    font-size: 10px;
+    letter-spacing: 0.8px;
+    color: var(--text);
+    font-weight: 700;
+    padding: 6px 4px;
+    border-bottom: 2px solid var(--border);
+    border-right: 1px solid var(--border);
+  }
+  .tabela-diaria thead tr:last-child th {
+    background: var(--surface2);
+    text-align: center;
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--muted);
+    font-weight: 600;
+    padding: 4px 4px;
+    border-bottom: 2px solid var(--border);
+    border-right: 1px solid rgba(30,40,64,0.5);
+    white-space: nowrap;
+  }
+  .tabela-diaria td {
+    padding: 4px 5px;
+    text-align: center;
+    border-bottom: 1px solid rgba(30,40,64,0.4);
+    border-right: 1px solid rgba(30,40,64,0.3);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    line-height: 1.3;
+  }
+  .tabela-diaria td:first-child {
+    text-align: left;
+    font-family: 'Syne', sans-serif;
+    font-weight: 600;
+    font-size: 10px;
+    background: var(--surface2);
+    padding-left: 8px;
+    white-space: nowrap;
+  }
+  .tabela-diaria tr:last-child td { border-bottom: none; }
+  .tabela-diaria tr:hover td { background: rgba(255,255,255,0.025); }
+  .tabela-diaria tr:hover td:first-child { background: #1e2535; }
+
+  /* Linha de folga/fim de semana */
+  .td-folga { background: rgba(255,204,0,0.08) !important; color: var(--accent4) !important; font-weight: 700; font-size: 10px; }
+  .td-folga-data { background: rgba(255,204,0,0.12) !important; color: var(--accent4) !important; }
+
+  /* Linha de parada */
+  .td-parada { background: rgba(255,107,53,0.08) !important; color: var(--accent2) !important; font-weight: 600; font-size: 9px; }
+
+  /* Células de valor */
+  .td-valor-ok { color: var(--accent3); font-weight: 700; }
+  .td-valor-zero { color: var(--muted); }
+
+  /* Linha de total */
+  .tr-total td {
+    background: #1a2035 !important;
+    font-weight: 800 !important;
+    font-size: 10px !important;
+    color: var(--accent) !important;
+    border-top: 2px solid var(--border) !important;
+    border-bottom: none !important;
+    padding: 5px 5px !important;
+  }
+  .tr-total td:first-child { color: var(--text) !important; font-family: 'Syne', sans-serif !important; }
+
+  /* Chip de tipo de serviço */
+  .chip-tipo {
+    display: inline-block;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    font-family: 'Syne', sans-serif;
+  }
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+  }
+  .table-header { padding: 20px 24px; border-bottom: 1px solid var(--border); }
+
+  table { width: 100%; border-collapse: collapse; }
+  thead tr { background: var(--surface2); }
+  th { padding: 12px 16px; text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--muted); font-weight: 600; }
+  td { padding: 14px 16px; font-size: 13px; border-bottom: 1px solid rgba(30,40,64,0.5); }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+
+  .team-name { display: flex; align-items: center; gap: 10px; font-weight: 700; }
+
+  .badge {
+    display: inline-flex; align-items: center;
+    padding: 3px 10px; border-radius: 20px;
+    font-size: 11px; font-weight: 600;
+  }
+  .badge-ok { background: rgba(126,255,107,0.1); color: var(--accent3); }
+  .badge-warn { background: rgba(255,204,0,0.1); color: var(--accent4); }
+  .badge-danger { background: rgba(255,107,53,0.1); color: var(--accent2); }
+
+  /* JUSTIFICATIVAS */
+  .justificativas-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+  .just-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px;
+  }
+  .just-card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .just-card-title { display: flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 700; }
+  .just-entries { display: flex; flex-direction: column; gap: 10px; }
+  .just-entry {
+    background: var(--surface2);
+    border-radius: 8px;
+    padding: 12px;
+    border-left: 3px solid;
+  }
+  .just-date { font-size: 10px; color: var(--muted); font-family: 'JetBrains Mono', monospace; margin-bottom: 4px; }
+  .just-text { font-size: 12px; line-height: 1.5; }
+
+  /* MODAL */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.7);
+    z-index: 200;
+    align-items: center; justify-content: center;
+    backdrop-filter: blur(4px);
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 32px;
+    width: 500px;
+    max-height: 80vh;
+    overflow-y: auto;
+  }
+  .modal h3 { font-size: 18px; margin-bottom: 8px; }
+  .modal p { font-size: 13px; color: var(--muted); margin-bottom: 24px; }
+
+  .form-group { margin-bottom: 16px; }
+  label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 6px; letter-spacing: 0.5px; }
+  input, select, textarea {
+    width: 100%; padding: 10px 14px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 13px;
+    font-family: 'Syne', sans-serif;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  input:focus, select:focus, textarea:focus { border-color: var(--accent); }
+  textarea { resize: vertical; min-height: 80px; }
+  select option { background: var(--surface); }
+
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 24px; }
+
+  /* TABS */
+  .tabs { display: flex; gap: 4px; margin-bottom: 20px; }
+  .tab {
+    padding: 8px 16px; border-radius: 8px;
+    font-size: 12px; font-weight: 600;
+    cursor: pointer;
+    color: var(--muted);
+    transition: all 0.2s;
+  }
+  .tab.active { background: var(--accent); color: #000; }
+  .tab:hover:not(.active) { background: var(--surface2); color: var(--text); }
+
+  /* PAGES */
+  .page { display: none; }
+  .page.active { display: flex; flex-direction: column; gap: 24px; }
+
+  /* SCROLLBAR */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  /* MONTH FILTER */
+  .filter-bar {
+    display: flex; align-items: center; gap: 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px 20px;
+  }
+  .filter-bar label { font-size: 12px; color: var(--muted); white-space: nowrap; margin: 0; }
+  .filter-bar input, .filter-bar select { width: auto; flex: 1; }
+
+  .empty-state {
+    text-align: center; padding: 60px 20px; color: var(--muted);
+  }
+  .empty-state .icon { font-size: 48px; margin-bottom: 16px; }
+  .empty-state h3 { font-size: 16px; color: var(--text); margin-bottom: 8px; }
+  .empty-state p { font-size: 13px; }
+
+  /* HEATMAP */
+  .heatmap-wrap { overflow-x: auto; }
+  .heatmap-grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 4px; min-width: 600px; }
+  .heatmap-cell {
+    aspect-ratio: 1;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: transform 0.15s;
+    position: relative;
+  }
+  .heatmap-cell:hover { transform: scale(1.2); z-index: 1; }
+  .heatmap-months { display: grid; grid-template-columns: repeat(12, 1fr); gap: 4px; min-width: 600px; margin-bottom: 6px; }
+  .heatmap-month { font-size: 10px; color: var(--muted); text-align: center; }
+
+  /* Progress bar */
+  .progress-bar { background: var(--surface2); border-radius: 6px; height: 6px; overflow: hidden; margin-top: 8px; }
+  .progress-fill { height: 100%; border-radius: 6px; transition: width 0.5s; }
+
+  /* Tooltip-like info */
+  .info-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid rgba(30,40,64,0.4); }
+  .info-row:last-child { border-bottom: none; }
+  .info-key { font-size: 12px; color: var(--muted); }
+  .info-val { font-size: 13px; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+
+  @keyframes fadeUp { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
+  .kpi-card { animation: fadeUp 0.4s both; }
+  .kpi-card:nth-child(1) { animation-delay: 0.05s; }
+  .kpi-card:nth-child(2) { animation-delay: 0.1s; }
+  .kpi-card:nth-child(3) { animation-delay: 0.15s; }
+  .kpi-card:nth-child(4) { animation-delay: 0.2s; }
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div class="logo">
+    <h1>DASHBOARD<br><span>LINHA VIVA</span></h1>
+  </div>
+  <nav class="nav">
+    <div class="nav-section">PAINEL</div>
+    <div class="nav-item active" onclick="navigate('dashboard', this)">
+      <span class="icon">⚡</span> Dashboard
+    </div>
+    <div class="nav-item" onclick="navigate('faturamento', this)">
+      <span class="icon">💰</span> Faturamento
+    </div>
+    <div class="nav-item" onclick="navigate('producao', this)">
+      <span class="icon">📊</span> Produção
+    </div>
+    <div class="nav-section">EQUIPES</div>
+    <div class="nav-item" onclick="navigate('equipes', this)">
+      <span class="icon">👥</span> Equipes
+    </div>
+    <div class="nav-item" onclick="navigate('justificativas', this)">
+      <span class="icon">📋</span> Justificativas
+    </div>
+    <div class="nav-item" onclick="navigate('cancelados', this)">
+      <span class="icon">🚫</span> Cancelados
+    </div>
+    <div class="nav-section">DADOS</div>
+    <div class="nav-item" onclick="navigate('importar', this)">
+      <span class="icon">📥</span> Importar
+    </div>
+  </nav>
+  <div class="teams-badges">
+    <h4>EQUIPES ATIVAS</h4>
+    <div class="team-badge"><div class="dot" style="background:var(--lv01)"></div>LV-01 Jucier</div>
+    <div class="team-badge"><div class="dot" style="background:var(--lv02)"></div>LV-02 Mauro</div>
+    <div class="team-badge"><div class="dot" style="background:var(--lv03)"></div>LV-03 Gleidson</div>
+    <div class="team-badge"><div class="dot" style="background:var(--lv04)"></div>LV-04 Marcos Pinto</div>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<main class="main">
+  <div class="topbar">
+    <div class="topbar-left">
+      <h2 id="pageTitle">Dashboard Geral</h2>
+      <div><span id="pageDate">Carregando...</span></div>
+    </div>
+    <div class="topbar-right">
+      <div id="lastUpdateBadge" style="display:none;align-items:center;gap:8px;background:rgba(255,107,53,0.08);border:1px solid rgba(255,107,53,0.25);border-radius:8px;padding:7px 14px;">
+        <span style="font-size:11px;color:#ff6b35;font-weight:600;letter-spacing:0.5px">🕐 ÚLTIMA ATUALIZAÇÃO</span>
+        <span id="lastUpdateTime" style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);font-weight:500">—</span>
+      </div>
+      <button class="btn btn-orange" onclick="navigate('importar', document.querySelector('.nav-item:last-of-type'))">📥 Atualizar Base</button>
+      <button class="btn-sync" id="btnSync" onclick="sincronizarGSheets()">🔄 Sincronizar</button>
+
+    </div>
+  </div>
+
+  <!-- OVERLAY SINCRONIZAÇÃO -->
+  <div id="syncOverlay">
+    <div class="sync-box">
+      <div class="sync-spinner" id="syncSpinner"></div>
+      <div class="sync-title" id="syncTitle">Sincronizando...</div>
+      <div class="sync-sub" id="syncSub">Buscando dados do Google Sheets</div>
+    </div>
+  </div>
+
+  <!-- OVERLAY PDF -->
+  <div id="pdfOverlay">
+    <div class="pdf-box">
+      <div style="font-size:40px;margin-bottom:12px">📄</div>
+      <div class="pdf-title">Gerando Relatório PDF</div>
+      <div class="pdf-sub">Capturando todos os painéis do dashboard...<br>Não feche esta janela.</div>
+      <div id="pdfProgressBar"><div id="pdfProgressFill"></div></div>
+      <div id="pdfStep" style="margin-top:10px">Iniciando...</div>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <!-- ========== DASHBOARD ========== -->
+    <div class="page active" id="page-dashboard">
+      <div class="filter-bar">
+        <label>📅 Mês:</label>
+        <select id="filtroMesDash" onchange="renderDashboard()" style="max-width:200px">
+          <option value="todos">Todos os meses</option>
+        </select>
+        <label style="margin-left:8px">Equipe:</label>
+        <select id="filtroEquipeDash" onchange="renderDashboard()" style="max-width:200px">
+          <option value="todas">Todas as equipes</option>
+          <option value="LV-01">LV-01 Jucier</option>
+          <option value="LV-02">LV-02 Mauro</option>
+          <option value="LV-03">LV-03 Gleidson</option>
+          <option value="LV-04">LV-04 Marcos Pinto</option>
+        </select>
+      </div>
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <div class="kpi-label">Faturamento Total</div>
+          <div class="kpi-value" id="kpi-fat" style="color:var(--accent3)">R$ 0</div>
+          <div class="kpi-sub">Acumulado do ano</div>
+          <div class="kpi-trend trend-up" id="kpi-fat-trend">—</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Produção (OS)</div>
+          <div class="kpi-value" id="kpi-os" style="color:var(--accent)">0</div>
+          <div class="kpi-sub">Ordens de serviço</div>
+          <div class="kpi-trend trend-up" id="kpi-os-trend">—</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Dias sem Produção</div>
+          <div class="kpi-value" id="kpi-dsem" style="color:var(--accent2)">0</div>
+          <div class="kpi-sub">Dias parados (total)</div>
+          <div class="kpi-trend trend-down" id="kpi-dsem-trend">—</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Média Diária</div>
+          <div class="kpi-value" id="kpi-med" style="color:var(--accent4)">R$ 0</div>
+          <div class="kpi-sub">Por dia trabalhado</div>
+          <div class="kpi-trend trend-up" id="kpi-med-trend">—</div>
+        </div>
+      </div>
+
+      <div class="charts-row">
+        <div class="chart-card">
+          <div class="section-header">
+            <div>
+              <div class="section-title">Faturamento Mensal</div>
+              <div class="section-sub">Evolução por equipe — 12 meses</div>
+            </div>
+          </div>
+          <canvas id="chartFatMensal"></canvas>
+        </div>
+        <div class="chart-card">
+          <div class="section-header">
+            <div>
+              <div class="section-title">Participação por Equipe</div>
+              <div class="section-sub">% do faturamento total</div>
+            </div>
+          </div>
+          <canvas id="chartPizza"></canvas>
+        </div>
+      </div>
+
+      <div class="charts-row2">
+        <div class="chart-card">
+          <div class="section-header">
+            <div>
+              <div class="section-title">OS por Equipe / Mês</div>
+              <div class="section-sub">Volume de ordens</div>
+            </div>
+          </div>
+          <canvas id="chartOSBar"></canvas>
+        </div>
+        <div class="chart-card">
+          <div class="section-header">
+            <div>
+              <div class="section-title">Dias sem Produção</div>
+              <div class="section-sub">Por equipe no período</div>
+            </div>
+          </div>
+          <canvas id="chartDiasSem"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== FATURAMENTO ========== -->
+    <div class="page" id="page-faturamento">
+      <div class="filter-bar">
+        <label>📅 Mês:</label>
+        <select id="filtroMes" onchange="renderFaturamento()" style="max-width:180px">
+          <option value="todos">Todos os meses</option>
+        </select>
+        <label>Equipe:</label>
+        <select id="filtroEquipeFat" onchange="renderFaturamento()">
+          <option value="todas">Todas as equipes</option>
+          <option value="LV-01">LV-01 Jucier</option>
+          <option value="LV-02">LV-02 Mauro</option>
+          <option value="LV-03">LV-03 Gleidson</option>
+          <option value="LV-04">LV-04 Marcos Pinto</option>
+        </select>
+      </div>
+
+      <div class="charts-row">
+        <div class="chart-card">
+          <div class="section-header">
+            <div class="section-title">Faturamento Diário</div>
+          </div>
+          <canvas id="chartFatDiario"></canvas>
+        </div>
+        <div class="chart-card">
+          <div class="section-header">
+            <div class="section-title">Ranking de Equipes</div>
+          </div>
+          <canvas id="chartRanking"></canvas>
+        </div>
+      </div>
+
+      <div class="chart-card">
+        <div class="section-header">
+          <div class="section-title">Faturamento Acumulado</div>
+          <div class="section-sub">Linha de crescimento no período</div>
+        </div>
+        <canvas id="chartAcumulado" style="max-height:200px"></canvas>
+      </div>
+
+      <div class="table-wrap">
+        <div class="table-header">
+          <div class="section-title">Detalhamento de Faturamento</div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Equipe</th>
+              <th>Data</th>
+              <th>OS</th>
+              <th>Valor (R$)</th>
+              <th>Tipo de Serviço</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="tabelaFaturamento"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ========== PRODUÇÃO ========== -->
+    <div class="page" id="page-producao">
+      <div class="filter-bar">
+        <label>📅 Mês:</label>
+        <select id="filtroMesProd" onchange="renderProducao()" style="max-width:180px">
+          <option value="todos">Todos os meses</option>
+        </select>
+        <label>Equipe:</label>
+        <select id="filtroEquipeProd" onchange="renderProducao()">
+          <option value="todas">Todas as equipes</option>
+          <option value="LV-01">LV-01 Jucier</option>
+          <option value="LV-02">LV-02 Mauro</option>
+          <option value="LV-03">LV-03 Gleidson</option>
+          <option value="LV-04">LV-04 Marcos Pinto</option>
+        </select>
+      </div>
+      <div class="charts-row3">
+        <div class="chart-card">
+          <div class="section-header">
+            <div class="section-title">Eficiência por Equipe</div>
+          </div>
+          <canvas id="chartEficiencia"></canvas>
+        </div>
+        <div class="chart-card">
+          <div class="section-header">
+            <div class="section-title">Tipos de Serviço</div>
+          </div>
+          <canvas id="chartTipos"></canvas>
+        </div>
+        <div class="chart-card">
+          <div class="section-header">
+            <div class="section-title">Meta vs Realizado</div>
+          </div>
+          <canvas id="chartMeta"></canvas>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <div class="table-header">
+          <div class="section-title">Produção por Equipe — Resumo Mensal</div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Equipe</th>
+              <th>Dias Trabalhados</th>
+              <th>Dias Parados</th>
+              <th>OS Realizadas</th>
+              <th>Faturamento</th>
+              <th>Fat/Dia</th>
+              <th>Performance</th>
+            </tr>
+          </thead>
+          <tbody id="tabelaProducao"></tbody>
+        </table>
+      </div>
+
+      <!-- TABELA DIÁRIA -->
+      <div class="tabela-diaria-wrap">
+        <div class="table-header" style="padding:10px 16px;">
+          <div>
+            <div class="section-title" style="font-size:13px;">📅 Produção Dia a Dia</div>
+            <div class="section-sub" id="tabelaDiariaSubtitle" style="font-size:11px;">Valores executados por equipe — selecione um mês</div>
+          </div>
+        </div>
+        <div style="overflow-x:auto">
+          <table class="tabela-diaria" id="tabelaDiaria">
+            <thead id="tabelaDiariaHead"></thead>
+            <tbody id="tabelaDiariaBody"></tbody>
+            <tfoot id="tabelaDiariaFoot"></tfoot>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== EQUIPES ========== -->
+    <div class="page" id="page-equipes">
+      <div class="filter-bar">
+        <label>📅 Mês:</label>
+        <select id="filtroMesEquipes" onchange="renderEquipes()" style="max-width:180px">
+          <option value="todos">Todos os meses</option>
+        </select>
+      </div>
+      <div class="kpi-grid" id="equipes-kpi"></div>
+      <div id="equipes-detail"></div>
+    </div>
+
+    <!-- ========== JUSTIFICATIVAS ========== -->
+    <div class="page" id="page-justificativas">
+      <div class="filter-bar">
+        <label>📅 Mês:</label>
+        <select id="filtroMesJust" onchange="renderJustificativas()" style="max-width:180px">
+          <option value="todos">Todos os meses</option>
+        </select>
+        <label>Equipe:</label>
+        <select id="filtroEquipeJust" onchange="renderJustificativas()">
+          <option value="todas">Todas</option>
+          <option value="LV-01">LV-01 Jucier</option>
+          <option value="LV-02">LV-02 Mauro</option>
+          <option value="LV-03">LV-03 Gleidson</option>
+          <option value="LV-04">LV-04 Marcos Pinto</option>
+        </select>
+        <label>Motivo:</label>
+        <select id="filtroMotivoJust" onchange="renderJustificativas()">
+          <option value="todos">Todos</option>
+          <option value="Clima">Clima</option>
+          <option value="Equipamento">Equipamento</option>
+          <option value="Falta de Material">Falta de Material</option>
+          <option value="Falta/Atestado">Falta/Atestado</option>
+          <option value="Manutenção">Manutenção</option>
+          <option value="Sem OS">Sem OS</option>
+          <option value="Outros">Outros</option>
+        </select>
+      </div>
+
+      <div class="charts-row2">
+        <div class="chart-card">
+          <div class="section-header"><div class="section-title">Motivos de Parada</div></div>
+          <canvas id="chartMotivos"></canvas>
+        </div>
+        <div class="chart-card">
+          <div class="section-header"><div class="section-title">Dias Parados por Equipe</div></div>
+          <canvas id="chartDiasEquipe"></canvas>
+        </div>
+      </div>
+
+      <div class="justificativas-grid" id="justificativas-cards"></div>
+    </div>
+
+    <!-- ========== CANCELADOS ========== -->
+    <div class="page" id="page-cancelados">
+      <div class="filter-bar">
+        <label>📅 Mês:</label>
+        <select id="filtroMesCanel" onchange="renderCancelados()" style="max-width:180px">
+          <option value="todos">Todos os meses</option>
+        </select>
+        <label>Equipe:</label>
+        <select id="filtroEquipeCanel" onchange="renderCancelados()">
+          <option value="todas">Todas</option>
+          <option value="LV-01">LV-01 Jucier</option>
+          <option value="LV-02">LV-02 Mauro</option>
+          <option value="LV-03">LV-03 Gleidson</option>
+          <option value="LV-04">LV-04 Marcos Pinto</option>
+        </select>
+        <label>Motivo:</label>
+        <select id="filtroMotivoCanel" onchange="renderCancelados()">
+          <option value="todos">Todos</option>
+        </select>
+      </div>
+
+      <!-- KPIs -->
+      <div class="kpi-grid" id="cancelados-kpi"></div>
+
+      <!-- Gráficos linha 1 -->
+      <div class="charts-row">
+        <div class="chart-card">
+          <div class="section-header">
+            <div class="section-title">🚫 Cancelamentos por Equipe</div>
+          </div>
+          <canvas id="chartCanelEquipe"></canvas>
+        </div>
+        <div class="chart-card">
+          <div class="section-header">
+            <div class="section-title">📊 Motivos de Cancelamento</div>
+          </div>
+          <canvas id="chartCanelMotivos"></canvas>
+        </div>
+        <div class="chart-card">
+          <div class="section-header">
+            <div class="section-title">💰 Valor Cancelado por Equipe</div>
+          </div>
+          <canvas id="chartCanelValor"></canvas>
+        </div>
+      </div>
+
+      <!-- Gráficos linha 2 -->
+      <div class="charts-row2">
+        <div class="chart-card">
+          <div class="section-header">
+            <div class="section-title">📋 Quantidade por Motivo e Descrição</div>
+          </div>
+          <canvas id="chartCanelMensal"></canvas>
+        </div>
+        <div class="chart-card">
+          <div class="section-header">
+            <div class="section-title">🔢 Tipo de Serviço Cancelado</div>
+          </div>
+          <canvas id="chartCanelTipo"></canvas>
+        </div>
+      </div>
+
+      <!-- Tabela detalhada -->
+      <div class="tabela-diaria-wrap" id="cancelados-tabela-wrap">
+        <div class="table-header" style="padding:12px 20px;">
+          <div>
+            <div class="section-title" style="font-size:13px;">📋 Registros de Cancelamentos</div>
+            <div class="section-sub" id="canceladosSubtitle" style="font-size:11px;">Todos os serviços cancelados importados da aba "cancelados"</div>
+          </div>
+        </div>
+        <div style="overflow-x:auto">
+          <table class="tabela-diaria" id="canceladosTabela" style="table-layout:auto">
+            <thead>
+              <tr>
+                <th style="text-align:left;padding-left:10px;min-width:90px">DATA</th>
+                <th style="min-width:80px">EQUIPE</th>
+                <th style="min-width:60px">OS</th>
+                <th style="min-width:120px">MOTIVO</th>
+                <th style="min-width:100px">TIPO SERV.</th>
+                <th style="min-width:90px">VALOR (R$)</th>
+                <th style="min-width:180px;text-align:left">DESCRIÇÃO</th>
+              </tr>
+            </thead>
+            <tbody id="canceladosTbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== IMPORTAR ========== -->
+    <div class="page" id="page-importar">
+      <div class="import-area" id="importArea" onclick="document.getElementById('fileInput').click()">
+        <div class="import-icon">📂</div>
+        <h3>Clique ou arraste seu arquivo aqui</h3>
+        <p>Suporta <strong>CSV</strong> ou <strong>Excel (.xlsx/.xls)</strong><br>
+        <strong style="color:var(--accent)">Colunas aceitas:</strong> data, equipe, valor, tipo_servico (ou "tipo servico"), dias_sem_prod, justificativa<br>
+        <strong style="color:var(--muted);font-size:11px">Obs:</strong> Coluna "os" é opcional — será gerada automaticamente se não existir</p>
+        <input type="file" id="fileInput" accept=".csv,.json,.xlsx,.xls" onchange="handleFileImport(event)">
+      </div>
+
+      <!-- SELETOR DE ABA (aparece após carregar um Excel com múltiplas abas) -->
+      <div id="sheetSelector" style="display:none; margin-top:16px;">
+        <div class="chart-card" style="border-color:rgba(0,212,255,0.3)">
+          <div class="section-header">
+            <div>
+              <div class="section-title">📑 Selecionar Aba do Excel</div>
+              <div class="section-sub" id="sheetSelectorSub">Arquivo carregado — escolha qual aba importar</div>
+            </div>
+          </div>
+          <div style="padding:16px 20px;display:flex;flex-wrap:wrap;gap:10px;align-items:center" id="sheetButtonsRow"></div>
+        </div>
+      </div>
+
+      <div class="chart-card">
+        <div class="section-header">
+          <div class="section-title">📋 Formato Esperado do CSV</div>
+        </div>
+        <div style="background:var(--surface2);border-radius:8px;padding:16px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--muted);white-space:pre;overflow-x:auto;">
+data,mês,equipe,OS,valor,tipo_servico,dias_sem_prod,justificativa
+01/02/2026,,LV-01,1001,1200,GRUPO A,0,
+01/02/2026,,LV-02,,0,F,0,          ← folga LV-02 neste dia
+02/02/2026,,LV-01,,0,F,0,          ← folga LV-01 neste dia
+02/02/2026,,LV-02,1002,800,WTS,0,
+03/02/2026,,LV-03,1003,0,WTS,1,CHUVA
+04/02/2026,,LV-04,1004,15200,GRUPO A,0,
+
+<span style="color:var(--accent3)">✓ tipo_servico = F ou FOLGA → marca folga individual da equipe naquele dia
+✓ Cada equipe pode folgar em dias diferentes (escala rotativa)
+✓ OS pode ser número ou texto livre
+✓ Justificativa categoriza automaticamente o motivo de parada</span></div>
+        <div style="margin-top:16px">
+          <button class="btn btn-outline" onclick="loadDemoData()">🎲 Carregar Dados de Demonstração</button>
+          <button class="btn btn-outline" style="margin-left:10px" onclick="downloadTemplate()">⬇ Baixar Template CSV</button>
+          <button class="btn btn-danger" style="margin-left:10px" onclick="clearData()">🗑 Limpar Dados</button>
+        </div>
+      </div>
+
+      <div class="table-wrap" id="importPreview" style="display:none">
+        <div class="table-header">
+          <div class="section-title">Pré-visualização dos Dados Importados</div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Data</th><th>Equipe</th><th>OS</th><th>Valor</th><th>Tipo Serviço</th><th>Dias Parado</th><th>Justificativa</th>
+            </tr>
+          </thead>
+          <tbody id="importPreviewBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</main>
+
+<!-- MODAL LANÇAMENTO -->
+<div class="modal-overlay" id="entryModal">
+  <div class="modal">
+    <h3>+ Novo Lançamento</h3>
+    <p>Registre manualmente uma OS ou dia de produção</p>
+    <div class="form-group">
+      <label>Data</label>
+      <input type="date" id="entryData">
+    </div>
+    <div class="form-group">
+      <label>Equipe</label>
+      <select id="entryEquipe">
+        <option value="LV-01">LV-01 Jucier</option>
+        <option value="LV-02">LV-02 Mauro</option>
+        <option value="LV-03">LV-03 Gleidson</option>
+        <option value="LV-04">LV-04 Marcos Pinto</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Número da OS</label>
+      <input type="text" id="entryOS" placeholder="Ex: OS-1234">
+    </div>
+    <div class="form-group">
+      <label>Valor (R$)</label>
+      <input type="number" id="entryValor" placeholder="0.00" step="0.01">
+    </div>
+    <div class="form-group">
+      <label>Tipo de Serviço</label>
+      <select id="entryTipo">
+        <option>Manutenção Rede</option>
+        <option>Instalação</option>
+        <option>Emergência</option>
+        <option>Inspeção</option>
+        <option>Desligamento Programado</option>
+        <option>Modernização</option>
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal('entryModal')">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveEntry()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL JUSTIFICATIVA -->
+<div class="modal-overlay" id="justModal">
+  <div class="modal">
+    <h3>📋 Registrar Justificativa</h3>
+    <p>Registre um dia sem produção com justificativa</p>
+    <div class="form-group">
+      <label>Data</label>
+      <input type="date" id="justData">
+    </div>
+    <div class="form-group">
+      <label>Equipe</label>
+      <select id="justEquipe">
+        <option value="LV-01">LV-01 Jucier</option>
+        <option value="LV-02">LV-02 Mauro</option>
+        <option value="LV-03">LV-03 Gleidson</option>
+        <option value="LV-04">LV-04 Marcos Pinto</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Motivo</label>
+      <select id="justMotivo">
+        <option>Clima</option>
+        <option>Equipamento</option>
+        <option>Falta de Material</option>
+        <option>Falta/Atestado</option>
+        <option>Manutenção</option>
+        <option>Sem OS</option>
+        <option>Outros</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Descrição</label>
+      <textarea id="justDescricao" placeholder="Descreva o motivo da paralisação..."></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal('justModal')">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveJustificativa()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===========================
+//  DATA STORE
+// ===========================
+let records = [];        // { data, equipe, os, valor, tipo_servico }
+let cancelados = [];     // { data, equipe, os, valor, tipo_servico, motivo, descricao }
+let lastImportDate = null;
+
+function setLastUpdate() {
+  lastImportDate = new Date();
+  const badge = document.getElementById('lastUpdateBadge');
+  const time  = document.getElementById('lastUpdateTime');
+  badge.style.display = 'flex';
+  time.textContent = lastImportDate.toLocaleString('pt-BR', {
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', second: '2-digit'
+  });
+}
+
+let justificativas = []; // { data, equipe, motivo, descricao }
+
+const TEAMS = [
+  { id: 'LV-01', name: 'LV-01 Jucier',      color: '#00d4ff', metaDiaria: 5500 },
+  { id: 'LV-02', name: 'LV-02 Mauro',       color: '#ff6b35', metaDiaria: 3500 },
+  { id: 'LV-03', name: 'LV-03 Gleidson',    color: '#7eff6b', metaDiaria: 3500 },
+  { id: 'LV-04', name: 'LV-04 Marcos Pinto',color: '#ffcc00', metaDiaria: 3500 },
+];
+const MONTHS = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+const MONTHS_FULL = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+
+let charts = {};
+
+// Registra o plugin datalabels mas desliga por padrão (ativa por gráfico)
+Chart.register(ChartDataLabels);
+Chart.defaults.plugins.datalabels.display = false;
+
+// ===========================
+//  HELPERS DE META
+// ===========================
+// Retorna o nº de dias úteis de uma equipe num conjunto de records/folgas
+// = total de dias distintos no período - dias de folga da equipe
+function calcularDiasUteis(teamId, recsDoFiltro) {
+  // Dias de folga: registros com tipo_servico F/FOLGA para esta equipe
+  const diasFolga = new Set(
+    recsDoFiltro
+      .filter(r => r.equipe === teamId && ['F','FOLGA'].includes(String(r.tipo_servico||'').trim().toUpperCase()))
+      .map(r => r.data)
+  );
+  // Dias trabalhados: registros com valor > 0 (excluindo folgas)
+  const diasTrab = new Set(
+    recsDoFiltro
+      .filter(r => r.equipe === teamId && !['F','FOLGA'].includes(String(r.tipo_servico||'').trim().toUpperCase()) && r.valor > 0)
+      .map(r => r.data)
+  );
+  // Dias parados: justificativas da equipe no período
+  const diasParados = new Set(
+    justificativas
+      .filter(j => j.equipe === teamId && diasTrab.size + diasFolga.size > 0)
+      .map(j => j.data)
+  );
+  // Dias úteis = trabalhados + parados (sem folga, sem FDS implícito)
+  const diasUteis = new Set([...diasTrab, ...diasParados]);
+  return diasUteis.size;
+}
+
+// Calcula dias úteis de uma equipe num intervalo de mês específico (para dashboard mensal)
+// allRecords = records completos (sem filtro de mês)
+function calcularDiasUteisMes(teamId, mesIdx, allRecords) {
+  // mesIdx: 0-based (Jan=0)
+  const recsDoMes = allRecords.filter(r => r.mes === mesIdx + 1);
+  return calcularDiasUteis(teamId, recsDoMes);
+}
+
+// Meta acumulada real de uma equipe num conjunto filtrado
+function calcularMeta(teamId, recsDoFiltro) {
+  const t = TEAMS.find(t => t.id === teamId);
+  if (!t) return 0;
+  return t.metaDiaria * calcularDiasUteis(teamId, recsDoFiltro);
+}
+
+// ===========================
+//  NAVIGATION
+// ===========================
+function navigate(page, el) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + page).classList.add('active');
+  if (el) el.classList.add('active');
+  else {
+    document.querySelectorAll('.nav-item').forEach(n => {
+      if (n.textContent.toLowerCase().includes(page === 'importar' ? 'import' : page.slice(0,4))) n.classList.add('active');
+    });
+  }
+  const titles = { dashboard:'Dashboard Geral', faturamento:'Análise de Faturamento', producao:'Painel de Produção', equipes:'Equipes', justificativas:'Dias sem Produção', cancelados:'Serviços Cancelados', importar:'Importar Dados' };
+  document.getElementById('pageTitle').textContent = titles[page] || page;
+  renderPage(page);
+}
+
+function renderPage(page) {
+  if (page === 'dashboard') renderDashboard();
+  if (page === 'faturamento') renderFaturamento();
+  if (page === 'producao') renderProducao();
+  if (page === 'equipes') renderEquipes();
+  if (page === 'justificativas') renderJustificativas();
+  if (page === 'cancelados') renderCancelados();
+  setTimeout(injetarBotoesCaptura, 300);
+}
+
+// ===========================
+//  CHART HELPERS
+// ===========================
+function destroyChart(id) {
+  if (charts[id]) { charts[id].destroy(); delete charts[id]; }
+}
+
+const chartDefaults = {
+  color: '#5a6380',
+  plugins: { legend: { labels: { color: '#5a6380', font: { family: 'Syne', size: 11 }, boxWidth: 12 } } },
+};
+Chart.defaults.color = '#5a6380';
+Chart.defaults.borderColor = '#1e2840';
+Chart.defaults.font.family = 'Syne';
+
+// OS válida = contém pelo menos um dígito numérico (ex: 38226011513, OS-1234, 400A)
+// Somente texto como "SERVIÇO CANCELADO", "EMERGENCIA", "F" não são OS
+function isOSValida(os) {
+  if (!os) return false;
+  return /\d/.test(String(os).trim());
+}
+
+function teamColor(id, alpha=1) {
+  const t = TEAMS.find(t => t.id === id);
+  if (!t) return `rgba(90,99,128,${alpha})`;
+  const hex = t.color;
+  const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+// ===========================
+//  DASHBOARD RENDER
+// ===========================
+function renderDashboard() {
+  const recs = filteredRecords('filtroMesDash');
+  const justs = filteredJusts('filtroMesDash');
+  const equipeF = document.getElementById('filtroEquipeDash')?.value || 'todas';
+
+  const recsF = equipeF === 'todas' ? recs : recs.filter(r => r.equipe === equipeF);
+  const justsF = equipeF === 'todas' ? justs : justs.filter(j => j.equipe === equipeF);
+
+  if (records.length === 0) {
+    document.getElementById('kpi-fat').textContent = 'R$ 0,00';
+    document.getElementById('kpi-os').textContent  = '0';
+    document.getElementById('kpi-dsem').textContent = '0';
+    document.getElementById('kpi-med').textContent = 'R$ 0,00';
+    destroyChart('chartFatMensal');
+    destroyChart('chartPizza');
+    destroyChart('chartOSBar');
+    destroyChart('chartDiasSem');
+    return;
+  }
+
+  const totalFat = recsF.reduce((s,r) => s + r.valor, 0);
+  const totalOS  = recsF.filter(r => isOSValida(r.os)).length;
+  const diasSem  = justsF.length;
+  const diasTrab = [...new Set(recsF.map(r => r.data))].length;
+  const med      = diasTrab > 0 ? totalFat / diasTrab : 0;
+
+  document.getElementById('kpi-fat').textContent = 'R$ ' + fmt(totalFat);
+  document.getElementById('kpi-os').textContent  = totalOS;
+  document.getElementById('kpi-dsem').textContent = diasSem;
+  document.getElementById('kpi-med').textContent = 'R$ ' + fmt(med);
+
+  // Chart: Faturamento mensal por equipe
+  destroyChart('chartFatMensal');
+  const ctx1 = document.getElementById('chartFatMensal').getContext('2d');
+  const monthData = {};
+  recsF.forEach(r => {
+    const d = parseDate(r.data);
+    if (!d) return;
+    const key = d.getMonth();
+    if (!monthData[key]) monthData[key] = {};
+    TEAMS.forEach(t => { if (!monthData[key][t.id]) monthData[key][t.id] = 0; });
+    monthData[key][r.equipe] = (monthData[key][r.equipe] || 0) + r.valor;
+  });
+  const labels = MONTHS;
+  // Meta por mês/equipe = metaDiaria × dias úteis reais daquele mês (descontando folgas)
+  charts['chartFatMensal'] = new Chart(ctx1, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        ...TEAMS.map(t => ({
+          label: t.name,
+          data: MONTHS.map((_,i) => (monthData[i] || {})[t.id] || 0),
+          backgroundColor: teamColor(t.id, 0.8),
+          borderRadius: 4,
+          stack: 'real',
+        })),
+        ...TEAMS.map(t => ({
+          label: `Meta ${t.name}`,
+          data: MONTHS.map((_,i) => t.metaDiaria * calcularDiasUteisMes(t.id, i, records)),
+          type: 'line',
+          borderColor: teamColor(t.id, 0.9),
+          borderWidth: 2,
+          borderDash: [6, 3],
+          pointRadius: 0,
+          fill: false,
+          tension: 0,
+          stack: undefined,
+          yAxisID: 'y',
+        }))
+      ]
+    },
+    options: {
+      responsive: true,
+      layout: { padding: { top: 20 } },
+      plugins: {
+        ...chartDefaults.plugins,
+        legend: { ...chartDefaults.plugins.legend, labels: { ...chartDefaults.plugins.legend.labels, filter: (item) => !item.text.startsWith('Meta ') } },
+      },
+      scales: {
+        x: { stacked: true, grid: { display: false } },
+        y: { stacked: false, ticks: { callback: v => 'R$'+fmtShort(v) } }
+      }
+    }
+  });
+
+  // Pizza
+  destroyChart('chartPizza');
+  const ctx2 = document.getElementById('chartPizza').getContext('2d');
+  const fatTeam = TEAMS.map(t => recsF.filter(r => r.equipe === t.id).reduce((s,r)=>s+r.valor,0));
+  charts['chartPizza'] = new Chart(ctx2, {
+    type: 'doughnut',
+    data: {
+      labels: TEAMS.map(t => t.name),
+      datasets: [{ data: fatTeam, backgroundColor: TEAMS.map(t => teamColor(t.id,0.85)), borderWidth: 2, borderColor: '#111520' }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        ...chartDefaults.plugins,
+        legend: { position:'bottom', labels: chartDefaults.plugins.legend.labels },
+        datalabels: {
+          display: ctx => ctx.dataset.data[ctx.dataIndex] > 0,
+          color: '#fff',
+          font: { family: 'JetBrains Mono', size: 11, weight: 'bold' },
+          formatter: (val, ctx) => {
+            const total = ctx.dataset.data.reduce((a,b) => a+b, 0);
+            return total > 0 ? Math.round(val/total*100) + '%' : '';
+          }
+        }
+      }
+    }
+  });
+
+  // OS Bar
+  destroyChart('chartOSBar');
+  const ctx3 = document.getElementById('chartOSBar').getContext('2d');
+  const osTeam = TEAMS.map(t => recsF.filter(r => r.equipe === t.id && isOSValida(r.os)).length);
+  charts['chartOSBar'] = new Chart(ctx3, {
+    type: 'bar',
+    data: {
+      labels: TEAMS.map(t => t.name),
+      datasets: [{ label: 'OS Realizadas', data: osTeam, backgroundColor: TEAMS.map(t => teamColor(t.id,0.8)), borderRadius: 6 }]
+    },
+    options: {
+      responsive: true,
+      layout: { padding: { top: 24 } },
+      plugins: {
+        legend: { display: false },
+        datalabels: {
+          display: true,
+          anchor: 'end', align: 'end',
+          clip: false,
+          color: '#e8eaf6',
+          font: { family: 'JetBrains Mono', size: 12, weight: 'bold' },
+          formatter: v => v > 0 ? v : ''
+        }
+      },
+      scales: { x: { grid: { display:false } }, y: { beginAtZero: true, ticks: { stepSize: 1 } } }
+    }
+  });
+
+  // Dias sem produção
+  destroyChart('chartDiasSem');
+  const ctx4 = document.getElementById('chartDiasSem').getContext('2d');
+  const dsTeam = TEAMS.map(t => justsF.filter(j => j.equipe === t.id).length);
+  charts['chartDiasSem'] = new Chart(ctx4, {
+    type: 'bar',
+    data: {
+      labels: TEAMS.map(t => t.name),
+      datasets: [{ label: 'Dias Parados', data: dsTeam, backgroundColor: TEAMS.map(t => teamColor(t.id,0.6)), borderRadius: 6 }]
+    },
+    options: {
+      responsive: true,
+      indexAxis: 'y',
+      layout: { padding: { right: 48 } },
+      plugins: {
+        legend: { display: false },
+        datalabels: {
+          display: true,
+          anchor: 'end', align: 'end',
+          clip: false,
+          color: '#e8eaf6',
+          font: { family: 'JetBrains Mono', size: 12, weight: 'bold' },
+          formatter: v => v > 0 ? v : ''
+        }
+      },
+      scales: { x: { beginAtZero: true }, y: { grid: { display: false } } }
+    }
+  });
+}
+
+// ===========================
+//  FATURAMENTO RENDER
+// ===========================
+function renderFaturamento() {
+  const equipeFiltro = document.getElementById('filtroEquipeFat')?.value || 'todas';
+
+  // allFiltered inclui folgas (para calcular meta correta)
+  let allFiltered = filteredRecords('filtroMes');
+  if (equipeFiltro !== 'todas') allFiltered = allFiltered.filter(r => r.equipe === equipeFiltro);
+
+  // filtered exclui folgas — usado nos gráficos de valor
+  const FOLGA_TIPOS = ['F','FOLGA'];
+  let filtered = allFiltered.filter(r => !FOLGA_TIPOS.includes(String(r.tipo_servico||'').trim().toUpperCase()));
+
+  // Se não há dados de produção, mostrar estado vazio
+  if (filtered.length === 0) {
+    destroyChart('chartFatDiario');
+    destroyChart('chartRanking');
+    destroyChart('chartAcumulado');
+    const tbody = document.getElementById('tabelaFaturamento');
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:32px">Nenhum dado encontrado. Importe dados ou ajuste os filtros.</td></tr>`;
+    return;
+  }
+
+  // Diário
+  destroyChart('chartFatDiario');
+  const dailyMap = {};
+  const dailyByTeam = {};
+  filtered.forEach(r => {
+    dailyMap[r.data] = (dailyMap[r.data]||0) + r.valor;
+    if (!dailyByTeam[r.equipe]) dailyByTeam[r.equipe] = {};
+    dailyByTeam[r.equipe][r.data] = (dailyByTeam[r.equipe][r.data]||0) + r.valor;
+  });
+  const days = Object.keys(dailyMap).sort();
+
+  // Conjunto de folgas por equipe no período filtrado (usa allFiltered)
+  const folgasPorEquipe = {};
+  TEAMS.forEach(t => {
+    folgasPorEquipe[t.id] = new Set(
+      allFiltered.filter(r => r.equipe === t.id && FOLGA_TIPOS.includes(String(r.tipo_servico||'').trim().toUpperCase()))
+               .map(r => r.data)
+    );
+  });
+
+  const metaDatasets = [];
+  if (equipeFiltro === 'todas') {
+    // Linha de meta total: soma das metas de equipes que NÃO estão de folga em cada dia
+    metaDatasets.push({
+      label: 'Meta Total',
+      data: days.map(day => TEAMS.reduce((s,t) => s + (folgasPorEquipe[t.id].has(day) ? 0 : t.metaDiaria), 0)),
+      borderColor: 'rgba(255,204,0,0.8)',
+      borderWidth: 2,
+      borderDash: [8, 4],
+      pointRadius: 0,
+      fill: false,
+      tension: 0,
+    });
+  } else {
+    const team = TEAMS.find(t => t.id === equipeFiltro);
+    if (team) {
+      metaDatasets.push({
+        label: `Meta ${team.name}`,
+        // Zero nos dias de folga, metaDiaria nos dias úteis
+        data: days.map(day => folgasPorEquipe[team.id].has(day) ? 0 : team.metaDiaria),
+        borderColor: teamColor(team.id, 0.9),
+        borderWidth: 2,
+        borderDash: [8, 4],
+        pointRadius: 0,
+        fill: false,
+        tension: 0,
+      });
+    }
+  }
+
+  const ctx1 = document.getElementById('chartFatDiario').getContext('2d');
+  charts['chartFatDiario'] = new Chart(ctx1, {
+    type: 'line',
+    data: {
+      labels: days.map(d => formatDateBR(d)),
+      datasets: [
+        { label: 'Faturamento Diário', data: days.map(d => dailyMap[d]), borderColor: '#00d4ff', backgroundColor: 'rgba(0,212,255,0.1)', fill: true, tension: 0.4, pointRadius: 3 },
+        ...metaDatasets
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { display: true, labels: { color: '#5a6380', font: { family: 'Syne', size: 11 }, boxWidth: 20 } },
+        tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: R$${fmt(ctx.parsed.y)}` } }
+      },
+      scales: { x: { grid: { display: false }, ticks: { maxTicksLimit: 10 } }, y: { ticks: { callback: v => 'R$'+fmtShort(v) } } }
+    }
+  });
+
+  // Ranking
+  destroyChart('chartRanking');
+  const rankData = TEAMS.map(t => ({
+    name: t.name,
+    val: filtered.filter(r => r.equipe === t.id).reduce((s,r)=>s+r.valor,0),
+    meta: calcularMeta(t.id, allFiltered),
+    color: teamColor(t.id,0.85),
+    id: t.id,
+  }));
+  rankData.sort((a,b) => b.val - a.val);
+  const ctx2 = document.getElementById('chartRanking').getContext('2d');
+  charts['chartRanking'] = new Chart(ctx2, {
+    type: 'bar',
+    data: {
+      labels: rankData.map(r => r.name),
+      datasets: [
+        {
+          label: 'Realizado',
+          data: rankData.map(r => r.val),
+          backgroundColor: rankData.map(r => r.color),
+          borderRadius: 6,
+        },
+        {
+          label: 'Meta',
+          data: rankData.map(r => r.meta),
+          backgroundColor: 'rgba(255,255,255,0.07)',
+          borderColor: 'rgba(255,204,0,0.7)',
+          borderWidth: 2,
+          borderRadius: 6,
+          borderDash: [4,4],
+        }
+      ]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      layout: { padding: { right: 56 } },
+      plugins: {
+        legend: { display: true, labels: { color: '#5a6380', font: { family: 'Syne', size: 11 }, boxWidth: 14 } },
+        tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: R$${fmt(ctx.parsed.x)}` } },
+        datalabels: {
+          display: ctx => ctx.datasetIndex === 0 && ctx.dataset.data[ctx.dataIndex] > 0,
+          anchor: 'end', align: 'end',
+          clip: false,
+          color: '#e8eaf6',
+          font: { family: 'JetBrains Mono', size: 11, weight: 'bold' },
+          formatter: v => 'R$' + fmtShort(v)
+        }
+      },
+      scales: {
+        x: { ticks: { callback: v => 'R$'+fmtShort(v) } },
+        y: { grid: { display: false } }
+      }
+    }
+  });
+
+  // Acumulado
+  destroyChart('chartAcumulado');
+  let acc = 0;
+  const accData = days.map(d => { acc += dailyMap[d]; return acc; });
+  const ctx3 = document.getElementById('chartAcumulado').getContext('2d');
+  charts['chartAcumulado'] = new Chart(ctx3, {
+    type: 'line',
+    data: {
+      labels: days.map(d => formatDateBR(d)),
+      datasets: [{ label: 'Acumulado', data: accData, borderColor: '#7eff6b', backgroundColor: 'rgba(126,255,107,0.08)', fill: true, tension: 0.3, pointRadius: 0 }]
+    },
+    options: { responsive: true, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false }, ticks: { maxTicksLimit: 8 } }, y: { ticks: { callback: v => 'R$'+fmtShort(v) } } } }
+  });
+
+  // Tabela
+  const tbody = document.getElementById('tabelaFaturamento');
+  if (filtered.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:32px">Nenhum dado encontrado. Importe dados ou ajuste os filtros.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = filtered.sort((a,b) => b.data.localeCompare(a.data)).slice(0,50).map(r => {
+    const t = TEAMS.find(t => t.id === r.equipe);
+    return `<tr>
+      <td><span class="team-name"><span class="dot" style="background:${t?.color}"></span>${t?.name||r.equipe}</span></td>
+      <td style="font-family:'JetBrains Mono',monospace">${formatDateBR(r.data)}</td>
+      <td style="font-family:'JetBrains Mono',monospace">${r.os||'—'}</td>
+      <td style="font-weight:700;color:var(--accent3)">R$ ${fmt(r.valor)}</td>
+      <td>${r.tipo_servico||'—'}</td>
+      <td><span class="badge badge-ok">✓ Concluído</span></td>
+    </tr>`;
+  }).join('');
+}
+
+// ===========================
+//  PRODUÇÃO RENDER
+// ===========================
+function renderProducao() {
+  const equipe = document.getElementById('filtroEquipeProd')?.value || 'todas';
+
+  // allFiltered inclui registros de folga (tipo F) — necessário para a tabela diária
+  let allFiltered = filteredRecords('filtroMesProd');
+  if (equipe !== 'todas') allFiltered = allFiltered.filter(r => r.equipe === equipe);
+
+  // filtered exclui folgas — usado nos gráficos e KPIs
+  const FOLGA_TIPOS = ['F','FOLGA'];
+  let filtered = allFiltered.filter(r => !FOLGA_TIPOS.includes(String(r.tipo_servico||'').trim().toUpperCase()));
+
+  let filtJust = filteredJusts('filtroMesProd');
+  if (equipe !== 'todas') filtJust = filtJust.filter(j => j.equipe === equipe);
+
+  // Se não há dados, mostrar estado vazio
+  if (filtered.length === 0) {
+    destroyChart('chartEficiencia');
+    destroyChart('chartTipos');
+    destroyChart('chartMeta');
+    const tbody = document.getElementById('tabelaProducao');
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:32px">Importe dados para visualizar</td></tr>`;
+    return;
+  }
+
+  const teamsFiltered = equipe === 'todas' ? TEAMS : TEAMS.filter(t => t.id === equipe);
+
+  // Eficiência (fat/OS)
+  destroyChart('chartEficiencia');
+  const efic = teamsFiltered.map(t => {
+    const os  = filtered.filter(r => r.equipe === t.id && isOSValida(r.os)).length;
+    const fat = filtered.filter(r => r.equipe === t.id).reduce((s,r)=>s+r.valor,0);
+    return os > 0 ? fat/os : 0;
+  });
+  const ctx1 = document.getElementById('chartEficiencia').getContext('2d');
+  charts['chartEficiencia'] = new Chart(ctx1, {
+    type: 'radar',
+    data: {
+      labels: teamsFiltered.map(t => t.name.split(' ')[0]),
+      datasets: [{ label: 'Fat/OS', data: efic, backgroundColor: 'rgba(0,212,255,0.2)', borderColor: '#00d4ff', pointBackgroundColor: '#00d4ff', borderWidth: 2 }]
+    },
+    options: { responsive: true, plugins: chartDefaults.plugins, scales: { r: { ticks: { display: false }, grid: { color: '#1e2840' }, pointLabels: { color: '#5a6380', font: { size:11 } } } } }
+  });
+
+  // Tipos de serviço — ignora células vazias, nulas ou valor padrão genérico
+  destroyChart('chartTipos');
+  const tiposMap = {};
+  const TIPO_INVALIDO = ['', '-', '—', 'serviço', 'servico', 'f', 'folga'];
+  filtered.forEach(r => {
+    const tipo = String(r.tipo_servico || '').trim();
+    if (!tipo || TIPO_INVALIDO.includes(tipo.toLowerCase())) return;
+    tiposMap[tipo] = (tiposMap[tipo] || 0) + 1;
+  });
+  const ctx2 = document.getElementById('chartTipos').getContext('2d');
+  charts['chartTipos'] = new Chart(ctx2, {
+    type: 'doughnut',
+    data: {
+      labels: Object.keys(tiposMap).length ? Object.keys(tiposMap) : ['Sem dados'],
+      datasets: [{ data: Object.values(tiposMap).length ? Object.values(tiposMap) : [1], backgroundColor: ['#00d4ff','#ff6b35','#7eff6b','#ffcc00','#a855f7','#ec4899'], borderWidth: 2, borderColor: '#111520' }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        ...chartDefaults.plugins,
+        legend: { position: 'bottom', labels: chartDefaults.plugins.legend.labels },
+        datalabels: {
+          display: ctx => ctx.dataset.data[ctx.dataIndex] > 0,
+          color: '#fff',
+          font: { family: 'JetBrains Mono', size: 11, weight: 'bold' },
+          formatter: (val, ctx) => {
+            const total = ctx.dataset.data.reduce((a,b) => a+b, 0);
+            return total > 0 ? Math.round(val/total*100) + '%' : '';
+          }
+        }
+      }
+    }
+  });
+
+  // Meta vs Realizado
+  destroyChart('chartMeta');
+  const fatTeam  = teamsFiltered.map(t => filtered.filter(r => r.equipe === t.id && !['F','FOLGA'].includes(String(r.tipo_servico||'').trim().toUpperCase())).reduce((s,r)=>s+r.valor,0));
+  const metaVals = teamsFiltered.map(t => calcularMeta(t.id, filtered));
+  const ctx3 = document.getElementById('chartMeta').getContext('2d');
+  charts['chartMeta'] = new Chart(ctx3, {
+    type: 'bar',
+    data: {
+      labels: teamsFiltered.map(t => t.id),
+      datasets: [
+        { label: 'Meta',      data: metaVals, backgroundColor: 'rgba(90,99,128,0.4)', borderRadius: 6 },
+        { label: 'Realizado', data: fatTeam,  backgroundColor: teamsFiltered.map(t => teamColor(t.id,0.85)), borderRadius: 6 }
+      ]
+    },
+    options: {
+      responsive: true,
+      layout: { padding: { top: 28 } },
+      plugins: {
+        ...chartDefaults.plugins,
+        datalabels: {
+          display: ctx => ctx.dataset.data[ctx.dataIndex] > 0,
+          anchor: 'end', align: 'end',
+          clip: false,
+          color: '#e8eaf6',
+          font: { family: 'JetBrains Mono', size: 10, weight: 'bold' },
+          formatter: v => 'R$' + fmtShort(v)
+        }
+      },
+      scales: { x: { grid: { display: false } }, y: { ticks: { callback: v => 'R$'+fmtShort(v) } } }
+    }
+  });
+
+  // Tabela produção
+  const tbody = document.getElementById('tabelaProducao');
+  const rows = teamsFiltered.map(t => {
+    const recs    = filtered.filter(r => r.equipe === t.id && !['F','FOLGA'].includes(String(r.tipo_servico||'').trim().toUpperCase()));
+    const fat     = recs.reduce((s,r)=>s+r.valor,0);
+    const os      = recs.filter(r=>isOSValida(r.os)).length;
+    const dias    = [...new Set(recs.map(r=>r.data))].length;
+    const parados = filtJust.filter(j=>j.equipe===t.id).length;
+    const media   = dias > 0 ? fat/dias : 0;
+    const metaAcum = calcularMeta(t.id, filtered);
+    const perf    = metaAcum > 0 ? Math.min(120, Math.round((fat / metaAcum) * 100)) : 0;
+    const perfColor = perf >= 100 ? 'var(--accent3)' : perf >= 75 ? 'var(--accent4)' : 'var(--accent2)';
+    return `<tr>
+      <td><span class="team-name"><span class="dot" style="background:${t.color}"></span>${t.name}</span></td>
+      <td>${dias}</td>
+      <td><span class="badge ${parados>5?'badge-danger':parados>2?'badge-warn':'badge-ok'}">${parados}</span></td>
+      <td>${os}</td>
+      <td style="font-weight:700;color:var(--accent3)">R$ ${fmt(fat)}</td>
+      <td>R$ ${fmt(media)} <span style="font-size:10px;color:var(--muted)">/ meta R$${fmtShort(t.metaDiaria)}/dia</span></td>
+      <td>
+        <div style="display:flex;align-items:center;gap:8px">
+          <div class="progress-bar" style="width:80px">
+            <div class="progress-fill" style="width:${Math.min(100,perf)}%;background:${perfColor}"></div>
+          </div>
+          <span style="font-size:11px;font-family:'JetBrains Mono',monospace;color:${perfColor}">${perf}%</span>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+  tbody.innerHTML = rows || `<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:32px">Importe dados para visualizar</td></tr>`;
+
+  // Tabela diária — recebe allFiltered (inclui folgas) para marcar corretamente cada equipe
+  renderTabelaDiaria(allFiltered, filtJust, teamsFiltered);
+}
+
+// ===========================
+//  TABELA DIÁRIA DE PRODUÇÃO
+// ===========================
+function renderTabelaDiaria(filtered, filtJust, teamsFiltered) {
+  const thead = document.getElementById('tabelaDiariaHead');
+  const tbody = document.getElementById('tabelaDiariaBody');
+  const tfoot = document.getElementById('tabelaDiariaFoot');
+  const subtitle = document.getElementById('tabelaDiariaSubtitle');
+
+  if (!thead || !tbody || !tfoot) return;
+
+  if (filtered.length === 0) {
+    thead.innerHTML = '';
+    tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;color:var(--muted);padding:32px;font-family:'Syne',sans-serif">Importe dados e selecione um mês para ver a tabela diária</td></tr>`;
+    tfoot.innerHTML = '';
+    return;
+  }
+
+  // Descobre intervalo de datas dos registros filtrados
+  const todasDatas = [...filtered.map(r => r.data), ...filtJust.map(j => j.data)];
+  const datasUnicas = [...new Set(todasDatas)].sort();
+  if (datasUnicas.length === 0) return;
+
+  // Pega o mês/ano a partir da primeira data
+  const primeiraData = parseDate(datasUnicas[0]);
+  const ultimaData   = parseDate(datasUnicas[datasUnicas.length - 1]);
+  const anoRef  = primeiraData.getFullYear();
+  const mesRef  = primeiraData.getMonth(); // 0-based
+
+  // Gera todos os dias do mês (ou intervalo se multi-mês)
+  const mesInicio = new Date(anoRef, mesRef, 1);
+  const mesFim    = new Date(ultimaData.getFullYear(), ultimaData.getMonth() + 1, 0);
+  const totalDias = Math.round((mesFim - mesInicio) / 86400000) + 1;
+
+  subtitle.textContent = `${MONTHS_FULL[mesRef]} ${anoRef} — valores executados por equipe`;
+
+  // Monta mapa de dados: { 'YYYY-MM-DD': { 'LV-01': {valor, tipos, oss, parada, justif, folga} } }
+  const mapaData = {};
+  for (let i = 0; i < totalDias; i++) {
+    const d = new Date(mesInicio);
+    d.setDate(d.getDate() + i);
+    const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    mapaData[key] = {};
+    teamsFiltered.forEach(t => { mapaData[key][t.id] = { valor: 0, tipos: [], oss: [], parada: false, justif: '', folga: false }; });
+  }
+
+  filtered.forEach(r => {
+    if (!mapaData[r.data]) return;
+    if (!mapaData[r.data][r.equipe]) return;
+    // Detecta folga: tipo_servico = 'F', 'FOLGA', 'f'
+    const tipoUpper = String(r.tipo_servico || '').trim().toUpperCase();
+    if (tipoUpper === 'F' || tipoUpper === 'FOLGA') {
+      mapaData[r.data][r.equipe].folga = true;
+      return; // não soma valor nem OS
+    }
+    mapaData[r.data][r.equipe].valor += r.valor;
+    if (r.tipo_servico && !mapaData[r.data][r.equipe].tipos.includes(r.tipo_servico))
+      mapaData[r.data][r.equipe].tipos.push(r.tipo_servico);
+    if (isOSValida(r.os)) mapaData[r.data][r.equipe].oss.push(r.os);
+  });
+
+  filtJust.forEach(j => {
+    if (!mapaData[j.data]) return;
+    if (!mapaData[j.data][j.equipe]) return;
+    mapaData[j.data][j.equipe].parada = true;
+    mapaData[j.data][j.equipe].justif = j.descricao || j.motivo || 'Parado';
+  });
+
+  // Paleta de cores para tipos de serviço
+  const tipoColors = {
+    'SGM': { bg: '#1a6bc7', text: '#fff' },
+    'GA':  { bg: '#c06010', text: '#fff' },
+    'WTS': { bg: '#1a9c3a', text: '#fff' },
+    '196': { bg: '#c01515', text: '#fff' },
+    'GRUPO A': { bg: '#1a6bc7', text: '#fff' },
+    'EMERGENCIA': { bg: '#c01515', text: '#fff' },
+    'EMERGÊNCIA': { bg: '#c01515', text: '#fff' },
+  };
+  function getTipoColor(tipo) {
+    const key = tipo.toUpperCase();
+    for (const k in tipoColors) { if (key.includes(k)) return tipoColors[k]; }
+    return { bg: '#2a3550', text: '#a0aec0' };
+  }
+
+  // Cabeçalho: linha 1 = equipes agrupadas (colspan 3 cada); linha 2 = Serviço | OS | Valor
+  const colsPerTeam = 3; // Serviço | OS | Valor
+  const numTeams = teamsFiltered.length;
+
+  // Larguras por número de equipes filtradas
+  const dataColW  = numTeams === 1 ? '115px' : numTeams === 2 ? '85px'  : numTeams <= 3 ? '90px'  : '105px';
+  const colServW  = numTeams === 1 ? '60px'  : numTeams === 2 ? '65px'  : '58px';
+  const colOsW    = numTeams === 1 ? '80px'  : numTeams === 2 ? '75px'  : '62px';
+  const colValW   = numTeams === 1 ? '90px'  : numTeams === 2 ? '80px'  : '70px';
+
+  // Força table-layout:fixed para respeitar as larguras definidas
+  const tabelaEl = document.getElementById('tabelaDiaria');
+  if (tabelaEl) {
+    tabelaEl.style.tableLayout = 'fixed';
+    tabelaEl.style.width = '100%';
+  }
+
+  let headRow1 = `<tr><th rowspan="2" style="text-align:left;padding-left:6px;width:${dataColW};min-width:${dataColW};max-width:${dataColW}">DATA</th>`;
+  let headRow2 = '';
+  teamsFiltered.forEach(t => {
+    headRow1 += `<th colspan="${colsPerTeam}" style="color:${t.color};border-left:2px solid ${t.color}40">${numTeams === 1 ? t.name : t.id}</th>`;
+    headRow2 += `<th style="border-left:2px solid rgba(30,40,64,0.8);width:${colServW}">TIPO</th><th style="width:${colOsW}">OS</th><th style="width:${colValW}">VALOR</th>`;
+  });
+  headRow1 += `</tr>`;
+  thead.innerHTML = headRow1 + `<tr>${headRow2}</tr>`;
+
+  // Totais por equipe
+  const totaisEquipe = {};
+  const totaisOSEquipe = {};
+  teamsFiltered.forEach(t => { totaisEquipe[t.id] = 0; totaisOSEquipe[t.id] = 0; });
+  let totalGeral = 0;
+  let totalOSGeral = 0;
+
+  // Linhas do corpo
+  const diasSemana = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+  const diasSemCurto = ['Do','Se','Te','Qa','Qi','Sx','Sb'];
+  let bodyHTML = '';
+
+  Object.keys(mapaData).sort().forEach(dataKey => {
+    const d = parseDate(dataKey);
+    if (!d) return;
+    const diaSem = d.getDay();
+    const isFDS = diaSem === 0 || diaSem === 6;
+    // Data compacta quando 1 equipe: "Se 01" sem barra; completo com 4 equipes
+    const diaLabel = numTeams === 1
+      ? `${diasSemana[diaSem]} ${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}`
+      : `${diasSemana[diaSem]} ${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}`;
+
+    const temDado = teamsFiltered.some(t => {
+      const cel = mapaData[dataKey][t.id];
+      return cel && (cel.valor > 0 || cel.parada);
+    });
+
+    const trClass = '';
+    const tdDataClass = '';
+
+    let row = `<tr>`;
+    row += `<td style="width:${dataColW};max-width:${dataColW};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-left:6px">${diaLabel}</td>`;
+
+    teamsFiltered.forEach(t => {
+      const cel = mapaData[dataKey][t.id];
+      const borderLeft = `border-left:2px solid ${t.color}22`;
+
+      if (cel.folga) {
+        // Folga individual desta equipe neste dia (veio da planilha com tipo_servico=F)
+        row += `<td colspan="${colsPerTeam}" class="td-folga" style="${borderLeft};background:rgba(255,204,0,0.10)">🔆 FOLGA</td>`;
+      } else if (cel.parada && cel.valor === 0) {
+        const justifShort = cel.justif.length > 22 ? cel.justif.slice(0,22)+'…' : cel.justif;
+        row += `<td colspan="${colsPerTeam}" class="td-parada" style="${borderLeft}" title="${cel.justif}">⛔ ${justifShort}</td>`;
+      } else if (cel.valor === 0 && !temDado) {
+        row += `<td style="${borderLeft}" class="td-valor-zero">—</td><td class="td-valor-zero">—</td><td class="td-valor-zero">—</td>`;
+      } else {
+        // Chip tipo de serviço
+        const tipo = cel.tipos[0] || '';
+        const tc = getTipoColor(tipo);
+        const chipTipo = tipo
+          ? `<span class="chip-tipo" style="background:${tc.bg};color:${tc.text}">${tipo}</span>`
+          : '<span style="color:var(--muted)">—</span>';
+
+        // Nº OS
+        const osCount = cel.oss.length;
+        let osDisplay = '—';
+        // Função para destacar "chuva" em vermelho
+        const destacarChuva = (txt) => txt.replace(/chuva/gi, m => `<span style="color:#ff4444;font-weight:700">${m}</span>`);
+        if (osCount > 0) {
+          if (osCount <= 2) {
+            osDisplay = destacarChuva(cel.oss.join(', '));
+          } else {
+            osDisplay = `${destacarChuva(cel.oss[0])}…<span style="color:var(--muted);font-size:9px"> +${osCount-1}</span>`;
+          }
+        }
+        const osClass = osCount > 0 ? '' : 'td-valor-zero';
+
+        // Valor
+        const valorClass = cel.valor > 0 ? 'td-valor-ok' : 'td-valor-zero';
+        const valorStr = cel.valor > 0 ? `R$ ${fmt(cel.valor)}` : '—';
+
+        const pardaIndicator = (cel.parada && cel.valor > 0)
+          ? `<span style="color:var(--accent2);font-size:9px;display:block" title="${cel.justif}">+parada</span>` : '';
+
+        row += `<td style="${borderLeft};width:${colServW};overflow:hidden">${chipTipo}${pardaIndicator}</td>`;
+        row += `<td class="${osClass}" style="font-size:9px;width:${colOsW};max-width:${colOsW};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${osDisplay}</td>`;
+        row += `<td class="${valorClass}" style="font-size:10px;width:${colValW};white-space:nowrap">${valorStr}</td>`;
+
+        totaisEquipe[t.id] += cel.valor;
+        totaisOSEquipe[t.id] += osCount;
+        totalGeral += cel.valor;
+        totalOSGeral += osCount;
+      }
+    });
+
+    row += '</tr>';
+    bodyHTML += row;
+  });
+
+  tbody.innerHTML = bodyHTML;
+
+  // Rodapé: totais
+  let footRow = `<tr class="tr-total"><td>📊 TOTAL MÊS</td>`;
+  teamsFiltered.forEach(t => {
+    footRow += `
+      <td style="border-left:2px solid ${t.color}50">—</td>
+      <td style="color:${t.color}">${totaisOSEquipe[t.id]} OS</td>
+      <td style="color:${t.color}">R$ ${fmt(totaisEquipe[t.id])}</td>`;
+  });
+  footRow += `</tr>`;
+  tfoot.innerHTML = footRow;
+}
+function renderEquipes() {
+  const filtered = filteredRecords('filtroMesEquipes');
+  const filtJust = filteredJusts('filtroMesEquipes');
+  const mes = document.getElementById('filtroMesEquipes')?.value || 'todos';
+
+  // Se não há dados, mostrar estado vazio
+  if (filtered.length === 0 && filtJust.length === 0) {
+    const kpiDiv = document.getElementById('equipes-kpi');
+    kpiDiv.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:60px 20px;color:var(--muted)">
+      <div style="font-size:48px;margin-bottom:16px">📊</div>
+      <h3 style="font-size:16px;color:var(--text);margin-bottom:8px">Nenhum dado encontrado</h3>
+      <p style="font-size:13px">Importe dados ou ajuste os filtros de período</p>
+    </div>`;
+    document.getElementById('equipes-detail').innerHTML = '';
+    return;
+  }
+
+  const periodoLabel = mes === 'todos'
+    ? 'Todos os meses'
+    : MONTHS_FULL[parseInt(mes)-1];
+
+  const kpiDiv = document.getElementById('equipes-kpi');
+  kpiDiv.innerHTML = TEAMS.map(t => {
+    const recs    = filtered.filter(r => r.equipe === t.id && !['F','FOLGA'].includes(String(r.tipo_servico||'').trim().toUpperCase()));
+    const fat     = recs.reduce((s,r)=>s+r.valor,0);
+    const os      = recs.filter(r=>isOSValida(r.os)).length;
+    const parados = filtJust.filter(j=>j.equipe===t.id).length;
+    const dias    = [...new Set(recs.filter(r => r.valor > 0).map(r=>r.data))].length;
+    const metaAcum = calcularMeta(t.id, filtered);
+    const perf    = metaAcum > 0 ? Math.min(120, Math.round((fat/metaAcum)*100)) : 0;
+    const perfColor = perf >= 100 ? 'var(--accent3)' : perf >= 75 ? 'var(--accent4)' : 'var(--accent2)';
+    const diasUteis = calcularDiasUteis(t.id, filtered);
+    return `<div class="kpi-card">
+      <div class="kpi-label">${t.name}</div>
+      <div class="kpi-value" style="color:${t.color};font-size:22px">R$ ${fmt(fat)}</div>
+      <div style="margin-top:8px">
+        <div class="progress-bar"><div class="progress-fill" style="width:${Math.min(100,perf)}%;background:${perfColor}"></div></div>
+        <div style="font-size:10px;color:${perfColor};text-align:right;margin-top:3px;font-family:'JetBrains Mono',monospace">${perf}% da meta — R$ ${fmt(metaAcum)}</div>
+      </div>
+      <div style="margin-top:10px;display:flex;flex-direction:column;gap:6px">
+        <div class="info-row"><span class="info-key">Meta Diária</span><span class="info-val" style="color:#ff6b35">R$ ${fmt(t.metaDiaria)}</span></div>
+        <div class="info-row"><span class="info-key">OS Realizadas</span><span class="info-val">${os}</span></div>
+        <div class="info-row"><span class="info-key">Dias Trabalhados</span><span class="info-val">${dias}</span></div>
+        <div class="info-row"><span class="info-key">Dias Parados</span><span class="info-val">${parados}</span></div>
+      </div>
+    </div>`;
+  }).join('');
+
+  const detail = document.getElementById('equipes-detail');
+  const isMensal = mes === 'todos';
+
+  detail.innerHTML = `<div class="charts-row2">` + TEAMS.map(t => {
+    return `<div class="chart-card">
+      <div class="section-header">
+        <div>
+          <div class="section-title" style="color:${t.color}">${t.name}</div>
+          <div class="section-sub">${isMensal ? 'Faturamento mensal' : 'Faturamento diário'} — ${periodoLabel}</div>
+        </div>
+      </div>
+      <canvas id="chartEquipe_${t.id.replace('-','_')}"></canvas>
+    </div>`;
+  }).join('') + `</div>`;
+
+  setTimeout(() => {
+    TEAMS.forEach(t => {
+      const recs = filtered.filter(r => r.equipe === t.id && !['F','FOLGA'].includes(String(r.tipo_servico||'').trim().toUpperCase()));
+      const folgasEquipe = new Set(
+        filtered.filter(r => r.equipe === t.id && ['F','FOLGA'].includes(String(r.tipo_servico||'').trim().toUpperCase()))
+                .map(r => r.data)
+      );
+      const id   = `chartEquipe_${t.id.replace('-','_')}`;
+      destroyChart(id);
+      const ctx = document.getElementById(id)?.getContext('2d');
+      if (!ctx) return;
+
+      let labels, data, metaData;
+      if (isMensal) {
+        labels = MONTHS;
+        data = MONTHS.map((_,i) => recs.filter(r => {
+          const d = parseDate(r.data);
+          return d && d.getMonth() === i;
+        }).reduce((s,r)=>s+r.valor,0));
+        // Meta mensal = metaDiaria × dias úteis reais daquele mês
+        metaData = MONTHS.map((_,i) => t.metaDiaria * calcularDiasUteisMes(t.id, i, records));
+      } else {
+        const dailyMap = {};
+        recs.forEach(r => { dailyMap[r.data] = (dailyMap[r.data]||0) + r.valor; });
+        const days = Object.keys(dailyMap).sort();
+        labels = days.map(d => formatDateBR(d));
+        data   = days.map(d => dailyMap[d]);
+        // Meta diária = 0 em dias de folga, metaDiaria nos demais
+        metaData = days.map(day => folgasEquipe.has(day) ? 0 : t.metaDiaria);
+      }
+
+      const metaLabel = isMensal ? 'Meta mensal' : 'Meta diária';
+
+      charts[id] = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [
+            {
+              label: 'Faturamento',
+              data,
+              borderColor: t.color,
+              backgroundColor: teamColor(t.id, 0.1),
+              fill: true,
+              tension: 0.4,
+              pointRadius: 4,
+              pointBackgroundColor: t.color
+            },
+            {
+              label: metaLabel,
+              data: metaData,
+              borderColor: 'rgba(255,204,0,0.7)',
+              borderWidth: 2,
+              borderDash: [6, 3],
+              pointRadius: 0,
+              fill: false,
+              tension: 0,
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: { display: true, labels: { color: '#5a6380', font: { family: 'Syne', size: 10 }, boxWidth: 16 } },
+            tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: R$${fmt(ctx.parsed.y)}` } }
+          },
+          scales: {
+            x: { grid: { display: false }, ticks: { maxTicksLimit: 8 } },
+            y: { ticks: { callback: v => 'R$'+fmtShort(v) } }
+          }
+        }
+      });
+    });
+  }, 100);
+}
+
+// ===========================
+//  CANCELADOS RENDER
+// ===========================
+function renderCancelados() {
+  const filtEquipe = document.getElementById('filtroEquipeCanel')?.value || 'todas';
+  const filtMotivo = document.getElementById('filtroMotivoCanel')?.value || 'todos';
+  const filtMes    = document.getElementById('filtroMesCanel')?.value || 'todos';
+
+  // Estado vazio — sem dados importados ainda
+  if (cancelados.length === 0) {
+    const kpiGrid = document.getElementById('cancelados-kpi');
+    if (kpiGrid) kpiGrid.innerHTML = `
+      <div class="kpi-card" style="grid-column:1/-1;text-align:center;padding:32px">
+        <div style="font-size:36px;margin-bottom:12px">🚫</div>
+        <div class="kpi-label" style="font-size:14px;margin-bottom:8px">Nenhum dado de cancelamentos</div>
+        <div style="font-size:12px;color:var(--muted)">Importe um arquivo Excel com a aba chamada <strong style="color:#ff4444">cancelados</strong><br>
+        Colunas: <code style="color:var(--accent)">data · equipe · os · valor · tipo_servico · motivo · descricao</code></div>
+      </div>`;
+    ['chartCanelEquipe','chartCanelMotivos','chartCanelValor','chartCanelMensal','chartCanelTipo'].forEach(id => destroyChart(id));
+    const tbody = document.getElementById('canceladosTbody');
+    if (tbody) tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--muted)">Sem dados — importe a aba "cancelados" do Excel</td></tr>`;
+    return;
+  }
+
+  // Filtra por mês
+  let filtered = cancelados.filter(c => filtMes === 'todos' || String(c.mes) === String(filtMes));
+  if (filtEquipe !== 'todas') filtered = filtered.filter(c => c.equipe === filtEquipe);
+  if (filtMotivo !== 'todos') filtered = filtered.filter(c => c.motivo === filtMotivo);
+
+  // Popula filtro de motivo dinamicamente
+  const selectMotivo = document.getElementById('filtroMotivoCanel');
+  if (selectMotivo) {
+    const motivos = [...new Set(cancelados.map(c => c.motivo).filter(Boolean))].sort();
+    const cur = selectMotivo.value;
+    selectMotivo.innerHTML = '<option value="todos">Todos</option>' + motivos.map(m => `<option value="${m}">${m}</option>`).join('');
+    if ([...selectMotivo.options].some(o => o.value === cur)) selectMotivo.value = cur;
+  }
+
+  const totalQtd   = filtered.length;
+  const totalValor = filtered.reduce((s,c) => s+c.valor, 0);
+  const equipesAfetadas = new Set(filtered.map(c => c.equipe)).size;
+  const motivoTop  = (() => {
+    const m = {}; filtered.forEach(c => m[c.motivo] = (m[c.motivo]||0)+1);
+    return Object.entries(m).sort((a,b)=>b[1]-a[1])[0]?.[0] || '—';
+  })();
+
+  // ── KPIs ──
+  const kpiGrid = document.getElementById('cancelados-kpi');
+  kpiGrid.innerHTML = `
+    <div class="kpi-card">
+      <div class="kpi-label">Total Cancelados</div>
+      <div class="kpi-value" style="color:#ff4444">${totalQtd}</div>
+      <div class="kpi-sub">serviços cancelados</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Valor Cancelado</div>
+      <div class="kpi-value" style="color:#ffcc00">R$ ${fmtShort(totalValor)}</div>
+      <div class="kpi-sub">total de OS canceladas</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Equipes Afetadas</div>
+      <div class="kpi-value" style="color:#00d4ff">${equipesAfetadas}</div>
+      <div class="kpi-sub">de ${TEAMS.length} equipes</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Motivo Principal</div>
+      <div class="kpi-value" style="color:#a855f7;font-size:16px">${motivoTop}</div>
+      <div class="kpi-sub">causa mais frequente</div>
+    </div>`;
+
+  // ── Gráfico: Cancelamentos por Equipe ──
+  destroyChart('chartCanelEquipe');
+  const qtdEquipe = TEAMS.map(t => filtered.filter(c => c.equipe === t.id).length);
+  charts['chartCanelEquipe'] = new Chart(
+    document.getElementById('chartCanelEquipe').getContext('2d'), {
+      type: 'bar',
+      data: {
+        labels: TEAMS.map(t => t.name.split(' ').slice(1).join(' ')),
+        datasets: [{ label: 'Cancelamentos', data: qtdEquipe, backgroundColor: TEAMS.map(t => teamColor(t.id, 0.8)), borderRadius: 6 }]
+      },
+      options: {
+        responsive: true, layout: { padding: { top: 28 } },
+        plugins: {
+          legend: { display: false },
+          datalabels: { display: true, anchor: 'end', align: 'end', clip: false, color: '#e8eaf6', font: { family: 'JetBrains Mono', size: 12, weight: 'bold' }, formatter: v => v > 0 ? v : '' }
+        },
+        scales: { x: { grid: { display: false } }, y: { beginAtZero: true, ticks: { stepSize: 1 } } }
+      }
+    });
+
+  // ── Gráfico: Motivos (doughnut) ──
+  destroyChart('chartCanelMotivos');
+  const motivoMap = {};
+  filtered.forEach(c => { motivoMap[c.motivo||'Outros'] = (motivoMap[c.motivo||'Outros']||0)+1; });
+  const mLabels = Object.keys(motivoMap).length > 0 ? Object.keys(motivoMap) : ['Sem dados'];
+  const mValues = Object.values(motivoMap).length > 0 ? Object.values(motivoMap) : [1];
+  const mColors = ['#ff4444','#ff6b35','#ffcc00','#00d4ff','#7eff6b','#a855f7','#ec4899','#14b8a6'];
+  charts['chartCanelMotivos'] = new Chart(
+    document.getElementById('chartCanelMotivos').getContext('2d'), {
+      type: 'doughnut',
+      data: { labels: mLabels, datasets: [{ data: mValues, backgroundColor: mColors.slice(0, mLabels.length), borderWidth: 2, borderColor: '#111520' }] },
+      options: {
+        responsive: true,
+        plugins: {
+          ...chartDefaults.plugins,
+          legend: { position: 'bottom', labels: chartDefaults.plugins.legend.labels },
+          datalabels: {
+            display: ctx => ctx.dataset.data[ctx.dataIndex] > 0,
+            color: '#fff', font: { family: 'JetBrains Mono', size: 10, weight: 'bold' },
+            formatter: (val, ctx) => { const t = ctx.dataset.data.reduce((a,b)=>a+b,0); return t>0?Math.round(val/t*100)+'%':''; }
+          }
+        }
+      }
+    });
+
+  // ── Gráfico: Valor cancelado por equipe (barra horizontal) ──
+  destroyChart('chartCanelValor');
+  const valorEquipe = TEAMS.map(t => filtered.filter(c => c.equipe === t.id).reduce((s,c)=>s+c.valor,0));
+  charts['chartCanelValor'] = new Chart(
+    document.getElementById('chartCanelValor').getContext('2d'), {
+      type: 'bar',
+      data: {
+        labels: TEAMS.map(t => t.name.split(' ').slice(1).join(' ')),
+        datasets: [{ label: 'Valor Cancelado', data: valorEquipe, backgroundColor: TEAMS.map(t => teamColor(t.id, 0.7)), borderRadius: 6 }]
+      },
+      options: {
+        indexAxis: 'y', responsive: true, layout: { padding: { right: 60 } },
+        plugins: {
+          legend: { display: false },
+          datalabels: { display: ctx => ctx.dataset.data[ctx.dataIndex] > 0, anchor: 'end', align: 'end', clip: false, color: '#e8eaf6', font: { family: 'JetBrains Mono', size: 10, weight: 'bold' }, formatter: v => v > 0 ? 'R$'+fmtShort(v) : '' }
+        },
+        scales: { x: { ticks: { callback: v => 'R$'+fmtShort(v) } }, y: { grid: { display: false } } }
+      }
+    });
+
+  // ── Gráfico: Quantidade por Motivo e Descrição (barras horizontais) ──
+  destroyChart('chartCanelMensal');
+  // Agrupa por "Motivo — Descrição" (truncada), ordena por quantidade desc
+  const descMap = {};
+  filtered.forEach(c => {
+    const desc = c.descricao ? c.descricao.slice(0, 40) + (c.descricao.length > 40 ? '…' : '') : '';
+    const label = desc ? `${c.motivo} — ${desc}` : (c.motivo || 'Não informado');
+    descMap[label] = (descMap[label] || 0) + 1;
+  });
+
+  const descEntries = Object.entries(descMap).sort((a, b) => b[1] - a[1]).slice(0, 15);
+  const descLabels = descEntries.map(e => e[0]);
+  const descValues = descEntries.map(e => e[1]);
+
+  // Cor baseada no motivo
+  const motivoCores = ['#ff4444','#ff6b35','#ffcc00','#00d4ff','#7eff6b','#a855f7','#ec4899','#14b8a6','#f97316','#6366f1'];
+  const motivosUnicos = [...new Set(filtered.map(c => c.motivo))];
+  const descColors = descEntries.map(e => {
+    const motivo = e[0].split(' — ')[0];
+    const idx = motivosUnicos.indexOf(motivo);
+    return motivoCores[idx % motivoCores.length] + 'cc';
+  });
+
+  charts['chartCanelMensal'] = new Chart(
+    document.getElementById('chartCanelMensal').getContext('2d'), {
+      type: 'bar',
+      data: {
+        labels: descLabels.length ? descLabels : ['Sem dados'],
+        datasets: [{
+          label: 'Ocorrências',
+          data: descLabels.length ? descValues : [0],
+          backgroundColor: descColors.length ? descColors : ['#ff444444'],
+          borderRadius: 4,
+        }]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        layout: { padding: { right: 40 } },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              title: items => items[0].label,
+              label: item => ` ${item.raw} ocorrência${item.raw !== 1 ? 's' : ''}`
+            }
+          },
+          datalabels: {
+            display: ctx => ctx.dataset.data[ctx.dataIndex] > 0,
+            anchor: 'end', align: 'end', clip: false,
+            color: '#e8eaf6',
+            font: { family: 'JetBrains Mono', size: 10, weight: 'bold' },
+            formatter: v => v > 0 ? v : ''
+          }
+        },
+        scales: {
+          x: { beginAtZero: true, ticks: { stepSize: 1 }, grid: { color: 'rgba(255,255,255,0.04)' } },
+          y: { grid: { display: false }, ticks: { font: { size: 10 }, color: '#a0aec0' } }
+        }
+      }
+    });
+
+  // ── Gráfico: Tipo de Serviço (doughnut) ──
+  destroyChart('chartCanelTipo');
+  const tipoMap = {};
+  filtered.forEach(c => { const t = c.tipo_servico||'Não informado'; tipoMap[t]=(tipoMap[t]||0)+1; });
+  const tLabels = Object.keys(tipoMap).length > 0 ? Object.keys(tipoMap) : ['Sem dados'];
+  const tValues = Object.values(tipoMap).length > 0 ? Object.values(tipoMap) : [1];
+  charts['chartCanelTipo'] = new Chart(
+    document.getElementById('chartCanelTipo').getContext('2d'), {
+      type: 'doughnut',
+      data: { labels: tLabels, datasets: [{ data: tValues, backgroundColor: ['#00d4ff','#7eff6b','#ffcc00','#ff6b35','#a855f7','#ec4899'].slice(0,tLabels.length), borderWidth: 2, borderColor: '#111520' }] },
+      options: {
+        responsive: true,
+        plugins: {
+          ...chartDefaults.plugins,
+          legend: { position: 'bottom', labels: chartDefaults.plugins.legend.labels },
+          datalabels: {
+            display: ctx => ctx.dataset.data[ctx.dataIndex] > 0,
+            color: '#fff', font: { family: 'JetBrains Mono', size: 10, weight: 'bold' },
+            formatter: (val, ctx) => { const t = ctx.dataset.data.reduce((a,b)=>a+b,0); return t>0?Math.round(val/t*100)+'%':''; }
+          }
+        }
+      }
+    });
+
+  // ── Tabela ──
+  const subtitle = document.getElementById('canceladosSubtitle');
+  if (subtitle) subtitle.innerHTML = `<strong style="color:#ff4444">${filtered.length}</strong> cancelamentos encontrados${filtMes !== 'todos' ? ` em <strong>${MONTHS_FULL[parseInt(filtMes)-1]}</strong>` : ''}`;
+
+  const tbody = document.getElementById('canceladosTbody');
+  if (!filtered.length) {
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--muted)">Nenhum cancelamento encontrado.<br><span style="font-size:11px">Importe um arquivo Excel com a aba "cancelados"</span></td></tr>`;
+    return;
+  }
+
+  const sorted = [...filtered].sort((a,b) => b.data.localeCompare(a.data));
+  tbody.innerHTML = sorted.map(c => {
+    const t = TEAMS.find(t => t.id === c.equipe);
+    const cor = t?.color || '#5a6380';
+    return `<tr>
+      <td style="text-align:left;padding-left:10px;white-space:nowrap">${formatDateBR(c.data)}</td>
+      <td><span style="color:${cor};font-weight:700">${c.equipe}</span></td>
+      <td style="font-family:'JetBrains Mono',monospace;font-size:10px">${c.os||'—'}</td>
+      <td><span class="chip-tipo" style="background:rgba(255,68,68,0.15);color:#ff4444;border:1px solid rgba(255,68,68,0.3)">${c.motivo||'—'}</span></td>
+      <td style="font-size:10px;color:var(--muted)">${c.tipo_servico||'—'}</td>
+      <td style="font-weight:700;color:${c.valor>0?'#ffcc00':'var(--muted)'}">${c.valor>0?'R$ '+fmt(c.valor):'—'}</td>
+      <td style="text-align:left;font-size:11px;color:var(--muted);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${c.descricao}">${c.descricao||'—'}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ===========================
+//  JUSTIFICATIVAS RENDER
+// ===========================
+function renderJustificativas() {
+  const filtEquipe = document.getElementById('filtroEquipeJust')?.value || 'todas';
+  const filtMotivo = document.getElementById('filtroMotivoJust')?.value || 'todos';
+
+  let filtered = filteredJusts('filtroMesJust');
+  if (filtEquipe !== 'todas') filtered = filtered.filter(j => j.equipe === filtEquipe);
+  if (filtMotivo !== 'todos') filtered = filtered.filter(j => j.motivo === filtMotivo);
+
+  // Motivos pie
+  destroyChart('chartMotivos');
+  const motivosMap = {};
+  filtered.forEach(j => { motivosMap[j.motivo] = (motivosMap[j.motivo]||0) + 1; });
+  const ctx1 = document.getElementById('chartMotivos').getContext('2d');
+  charts['chartMotivos'] = new Chart(ctx1, {
+    type: 'doughnut',
+    data: {
+      labels: Object.keys(motivosMap).length > 0 ? Object.keys(motivosMap) : ['Sem dados'],
+      datasets: [{ data: Object.values(motivosMap).length > 0 ? Object.values(motivosMap) : [1], backgroundColor: ['#00d4ff','#ff6b35','#7eff6b','#ffcc00','#a855f7','#ec4899'], borderWidth: 2, borderColor: '#111520' }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        ...chartDefaults.plugins,
+        legend: { position: 'bottom', labels: chartDefaults.plugins.legend.labels },
+        datalabels: {
+          display: ctx => ctx.dataset.data[ctx.dataIndex] > 0,
+          color: '#fff',
+          font: { family: 'JetBrains Mono', size: 11, weight: 'bold' },
+          formatter: (val, ctx) => {
+            const total = ctx.dataset.data.reduce((a,b) => a+b, 0);
+            return total > 0 ? Math.round(val/total*100) + '%' : '';
+          }
+        }
+      }
+    }
+  });
+
+  // Dias por equipe
+  destroyChart('chartDiasEquipe');
+  const diasEq = TEAMS.map(t => filtered.filter(j=>j.equipe===t.id).length);
+  const ctx2 = document.getElementById('chartDiasEquipe').getContext('2d');
+  charts['chartDiasEquipe'] = new Chart(ctx2, {
+    type: 'bar',
+    data: {
+      labels: TEAMS.map(t => t.name),
+      datasets: [{ label: 'Dias Parados', data: diasEq, backgroundColor: TEAMS.map(t=>teamColor(t.id,0.8)), borderRadius: 6 }]
+    },
+    options: {
+      responsive: true,
+      layout: { padding: { top: 28 } },
+      plugins: {
+        legend: { display: false },
+        datalabels: {
+          display: ctx => ctx.dataset.data[ctx.dataIndex] > 0,
+          anchor: 'end', align: 'end',
+          clip: false,
+          color: '#e8eaf6',
+          font: { family: 'JetBrains Mono', size: 12, weight: 'bold' },
+          formatter: v => v > 0 ? v + (v === 1 ? ' dia' : ' dias') : ''
+        }
+      },
+      scales: { x: { grid: { display: false } }, y: { beginAtZero: true } }
+    }
+  });
+
+  // Cards por equipe
+  const grid = document.getElementById('justificativas-cards');
+  grid.innerHTML = TEAMS.map(t => {
+    const entries = filtered.filter(j => j.equipe === t.id).sort((a,b) => b.data.localeCompare(a.data));
+    const team = TEAMS.find(tt => tt.id === t.id);
+    return `<div class="just-card">
+      <div class="just-card-header">
+        <div class="just-card-title">
+          <span class="dot" style="background:${team.color}"></span>
+          ${team.name}
+        </div>
+        <span class="badge ${entries.length>5?'badge-danger':entries.length>2?'badge-warn':'badge-ok'}">${entries.length} dia${entries.length!==1?'s':''}</span>
+      </div>
+      <div class="just-entries">
+        ${entries.length === 0 ? '<div style="text-align:center;color:var(--muted);font-size:12px;padding:16px">Sem registros para esta equipe</div>' :
+          entries.slice(0,4).map(j => `<div class="just-entry" style="border-color:${team.color}">
+            <div class="just-date">${formatDateBR(j.data)} · ${j.motivo}</div>
+            <div class="just-text">${j.descricao || '(sem descrição)'}</div>
+          </div>`).join('')}
+        ${entries.length > 4 ? `<div style="text-align:center;font-size:11px;color:var(--muted)">+${entries.length-4} registros</div>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ===========================
+//  SINCRONIZAR GOOGLE SHEETS
+// ===========================
+const GSHEETS_URLS = {
+  producao:   'https://docs.google.com/spreadsheets/d/e/2PACX-1vT9tqJJLs07MYS_upKcNXbPklKh11NnxW_JcPTZr4JAXEAy_pQfw_KapTriJsdt4YXK3PwwKqBk_ocX/pub?gid=1430081245&single=true&output=csv',
+  cancelados: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vT9tqJJLs07MYS_upKcNXbPklKh11NnxW_JcPTZr4JAXEAy_pQfw_KapTriJsdt4YXK3PwwKqBk_ocX/pub?gid=1066020024&single=true&output=csv',
+};
+
+// Proxies CORS em ordem de tentativa
+const CORS_PROXIES = [
+  'https://api.allorigins.win/raw?url=',
+  'https://corsproxy.io/?',
+  'https://cors-anywhere.herokuapp.com/',
+];
+
+async function fetchCSV(url) {
+  // Converte URL de publicação para URL de exportação direta
+  const urlExport = url
+    .replace('/pub?', '/export?format=csv&')
+    .replace('&output=csv', '')
+    .replace('&single=true', '');
+
+  const tentativas = [url, urlExport];
+
+  // Helper para ler resposta forçando UTF-8
+  const lerUTF8 = async (resp) => {
+    const buffer = await resp.arrayBuffer();
+    return new TextDecoder('utf-8').decode(buffer);
+  };
+
+  // 1) Tenta direto (funciona no Vercel publicado)
+  for (const u of tentativas) {
+    try {
+      const r = await fetch(u, { cache: 'no-store' });
+      if (r.ok) {
+        const txt = await lerUTF8(r);
+        if (txt && txt.trim().length > 10 && !txt.trim().startsWith('<')) return txt;
+      }
+    } catch(e) {}
+  }
+  console.warn('Fetch direto falhou, tentando proxies...');
+
+  // 2) Tenta cada proxy
+  for (const proxy of CORS_PROXIES) {
+    for (const u of tentativas) {
+      try {
+        const r = await fetch(proxy + encodeURIComponent(u), { cache: 'no-store' });
+        if (r.ok) {
+          const txt = await lerUTF8(r);
+          if (txt && txt.trim().length > 10 && !txt.trim().startsWith('<')) {
+            console.log('✅ Proxy funcionou:', proxy);
+            return txt;
+          }
+        }
+      } catch(e) { console.warn('Proxy falhou:', proxy, e.message); }
+    }
+  }
+
+  throw new Error(
+    'Não foi possível buscar os dados.\n' +
+    'Verifique se a planilha está publicada:\n' +
+    'Google Sheets → Arquivo → Publicar na Web → selecione a aba → CSV → Publicar'
+  );
+}
+
+async function sincronizarGSheets() {
+  const overlay = document.getElementById('syncOverlay');
+  const title   = document.getElementById('syncTitle');
+  const sub     = document.getElementById('syncSub');
+  const spinner = document.getElementById('syncSpinner');
+  const btn     = document.getElementById('btnSync');
+
+  const mostrar = (msg, detalhe) => { title.textContent = msg; if (sub) sub.textContent = detalhe; };
+
+  overlay.classList.add('active');
+  btn.classList.add('syncing');
+  btn.textContent = '⏳ Sincronizando...';
+  mostrar('Conectando...', 'Buscando dados do Google Sheets');
+
+  try {
+    // ── Produção ──
+    mostrar('Buscando produção...', 'Aguarde...');
+    const csv = await fetchCSV(GSHEETS_URLS.producao);
+    parseCSV(csv);
+    mostrar('Produção carregada ✓', `${records.length} registros encontrados`);
+    await new Promise(r => setTimeout(r, 400));
+
+    // ── Cancelados ──
+    if (GSHEETS_URLS.cancelados) {
+      mostrar('Buscando cancelados...', 'Aguarde...');
+      const csv2 = await fetchCSV(GSHEETS_URLS.cancelados);
+      const rows2 = csvParaRows(csv2);
+      parseCancelados(rows2);
+      mostrar('Cancelados carregados ✓', `${cancelados.length} registros encontrados`);
+      await new Promise(r => setTimeout(r, 400));
+    }
+
+    // Sucesso
+    if (spinner) {
+      spinner.style.animation = 'none';
+      spinner.innerHTML = '<div style="font-size:32px;line-height:48px">✅</div>';
+    }
+    mostrar('✅ Sincronizado com sucesso!',
+      `Produção: ${records.length} reg · Cancelados: ${cancelados.length} reg · ${new Date().toLocaleTimeString('pt-BR')}`);
+
+    afterImport();
+
+    btn.classList.remove('syncing');
+    btn.classList.add('success');
+    btn.textContent = '✅ Atualizado';
+    setTimeout(() => { btn.classList.remove('success'); btn.textContent = '🔄 Sincronizar'; }, 5000);
+
+    await new Promise(r => setTimeout(r, 2000));
+
+  } catch(err) {
+    console.error('Erro sync:', err);
+    mostrar('❌ Erro na sincronização', err.message);
+    if (spinner) { spinner.style.animation = 'none'; spinner.innerHTML = '<div style="font-size:32px;line-height:48px">❌</div>'; }
+    btn.classList.remove('syncing');
+    btn.classList.add('error');
+    btn.textContent = '❌ Erro';
+    setTimeout(() => { btn.classList.remove('error'); btn.textContent = '🔄 Sincronizar'; }, 5000);
+    await new Promise(r => setTimeout(r, 3500));
+
+  } finally {
+    overlay.classList.remove('active');
+    if (spinner) { spinner.style.animation = ''; spinner.style.borderTopColor = ''; spinner.innerHTML = ''; spinner.className = 'sync-spinner'; }
+  }
+}
+
+// Parser CSV robusto — suporta campos com aspas, vírgulas e quebras de linha
+function csvParaRows(csv) {
+  const linhas = [];
+  let campo = '', linha = [], dentroAspas = false;
+
+  for (let i = 0; i < csv.length; i++) {
+    const c = csv[i];
+    if (c === '"') {
+      if (dentroAspas && csv[i+1] === '"') { campo += '"'; i++; }
+      else dentroAspas = !dentroAspas;
+    } else if (c === ',' && !dentroAspas) {
+      linha.push(campo.trim()); campo = '';
+    } else if ((c === '\n' || c === '\r') && !dentroAspas) {
+      if (c === '\r' && csv[i+1] === '\n') i++;
+      linha.push(campo.trim()); campo = '';
+      if (linha.some(v => v !== '')) linhas.push(linha);
+      linha = [];
+    } else {
+      campo += c;
+    }
+  }
+  if (campo || linha.length) { linha.push(campo.trim()); if (linha.some(v => v !== '')) linhas.push(linha); }
+
+  if (linhas.length < 2) return [];
+  const headers = linhas[0].map(h => h.replace(/^"|"$/g, '').trim());
+  return linhas.slice(1).map(cols => {
+    const obj = {};
+    headers.forEach((h, i) => { obj[h] = (cols[i] ?? '').toString().replace(/^"|"$/g, '').trim(); });
+    return obj;
+  });
+}
+
+// ===========================
+//  IMPORT / DATA
+// ===========================
+// Armazena o workbook carregado para reuso ao trocar de aba
+let _workbookCache = null;
+
+function handleFileImport(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const fileName = file.name.toLowerCase();
+
+  if (fileName.endsWith('.csv')) {
+    const reader = new FileReader();
+    reader.onload = ev => {
+      try {
+        parseCSV(ev.target.result);
+        afterImport();
+      } catch(err) { alert('Erro ao importar CSV: ' + err.message); }
+    };
+    reader.readAsText(file, 'UTF-8');
+
+  } else if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
+    const reader = new FileReader();
+    reader.onload = ev => {
+      try {
+        const data = new Uint8Array(ev.target.result);
+        const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+        _workbookCache = workbook;
+
+        const abas = workbook.SheetNames;
+
+        if (abas.length === 1) {
+          // Só uma aba — importa direto
+          importarAba(abas[0]);
+        } else {
+          // Múltiplas abas — exibe seletor
+          mostrarSeletorAbas(abas, file.name);
+        }
+      } catch(err) { alert('Erro ao importar Excel: ' + err.message); }
+    };
+    reader.readAsArrayBuffer(file);
+
+  } else {
+    alert('Formato não suportado. Use CSV ou Excel (.xlsx/.xls)');
+  }
+}
+
+function mostrarSeletorAbas(abas, fileName) {
+  const seletor = document.getElementById('sheetSelector');
+  const sub     = document.getElementById('sheetSelectorSub');
+  const row     = document.getElementById('sheetButtonsRow');
+
+  // Importa automaticamente TODAS as abas reconhecidas de uma vez
+  importarTodasAbas(abas);
+
+  sub.innerHTML = `<strong style="color:var(--text)">"${fileName}"</strong> — ${abas.length} abas detectadas e importadas automaticamente`;
+  row.innerHTML = '';
+
+  abas.forEach((aba) => {
+    const nomeNorm = aba.toLowerCase().trim();
+    const isCanel  = nomeNorm === 'cancelados' || nomeNorm === 'cancelado';
+    const btn = document.createElement('button');
+    btn.className   = 'btn btn-outline';
+    btn.style.cssText = 'display:flex;align-items:center;gap:8px;padding:8px 16px;font-size:12px;border-radius:8px;cursor:default;opacity:0.85;';
+    btn.innerHTML   = `<span>${isCanel ? '🚫' : '📄'}</span><span><strong>${aba}</strong> <span style="font-size:10px;color:var(--muted)">${isCanel ? 'cancelamentos' : 'produção'}</span></span>`;
+    btn.style.borderColor = isCanel ? 'rgba(255,68,68,0.4)' : 'rgba(0,212,255,0.3)';
+    btn.style.color       = isCanel ? '#ff6666' : 'var(--accent)';
+    row.appendChild(btn);
+  });
+
+  seletor.style.display = 'block';
+}
+
+// Importa todas as abas do workbook de uma vez
+function importarTodasAbas(abas) {
+  if (!_workbookCache) return;
+  let totalRec = 0, totalCanel = 0;
+
+  abas.forEach(nomeAba => {
+    try {
+      const nomeNorm = nomeAba.toLowerCase().trim();
+      const ws   = _workbookCache.Sheets[nomeAba];
+      const rows = XLSX.utils.sheet_to_json(ws, { defval: null, raw: false });
+
+      if (nomeNorm === 'cancelados' || nomeNorm === 'cancelado') {
+        parseCancelados(rows);
+        totalCanel = cancelados.length;
+      } else {
+        parseExcelRows(rows);
+        totalRec = records.length;
+      }
+    } catch(err) {
+      console.warn(`Erro na aba "${nomeAba}":`, err);
+    }
+  });
+
+  afterImport();
+
+  const sub = document.getElementById('sheetSelectorSub');
+  if (sub) {
+    const partes = [];
+    if (totalRec  > 0) partes.push(`<span style="color:var(--accent)">${totalRec} registros de produção</span>`);
+    if (totalCanel> 0) partes.push(`<span style="color:#ff4444">${totalCanel} cancelamentos</span>`);
+    sub.innerHTML = partes.length
+      ? `Importado: ${partes.join(' · ')}`
+      : `<span style="color:var(--muted)">Nenhum dado encontrado nas abas</span>`;
+  }
+}
+
+function importarAba(nomeAba) {
+  if (!_workbookCache) return;
+  try {
+    const nomeNorm = nomeAba.toLowerCase().trim();
+    const ws   = _workbookCache.Sheets[nomeAba];
+    const rows = XLSX.utils.sheet_to_json(ws, { defval: null, raw: false });
+
+    if (nomeNorm === 'cancelados' || nomeNorm === 'cancelado') {
+      parseCancelados(rows);
+    } else {
+      parseExcelRows(rows);
+    }
+    afterImport();
+
+    const sub = document.getElementById('sheetSelectorSub');
+    if (sub) {
+      const tipo = (nomeNorm === 'cancelados' || nomeNorm === 'cancelado')
+        ? `<span style="color:#ff4444">${cancelados.length} cancelamentos</span>`
+        : `<span style="color:var(--accent)">${records.length} registros</span>`;
+      sub.innerHTML = `Aba importada: <strong style="color:var(--text)">${nomeAba}</strong> — ${tipo} carregados`;
+    }
+  } catch(err) {
+    alert(`Erro ao importar aba "${nomeAba}": ` + err.message);
+  }
+}
+
+// Parser da aba "cancelados"
+function parseCancelados(rows) {
+  const novos = [];
+
+  rows.forEach((row, idx) => {
+    // Helper: busca valor pelo nome da coluna com aliases
+    const get = (...aliases) => {
+      for (const alias of aliases) {
+        const key = Object.keys(row).find(k =>
+          k.toLowerCase().trim().replace(/[\s_\-]/g,'') === alias.replace(/[\s_\-]/g,'')
+        );
+        if (key !== undefined && row[key] !== null && row[key] !== undefined && String(row[key]).trim() !== '') {
+          return row[key];
+        }
+      }
+      return null;
+    };
+
+    const rawData   = get('data','date','dt','data_cancelamento','datacancelamento');
+    const rawEquipe = get('equipe','team','equip','time','lv','equipe_id','equipeid');
+    const os        = String(get('os','ordem','ordem_servico','ordemservico','order','numero_os','numeroos') || '').trim();
+    const rawValor  = get('valor','value','vl','vlr','valor_os','valoros','preco','price');
+    const tipo      = String(get('tipo_servico','tipo','type','servico','service','tiposervico') || '').trim();
+    const motivo    = String(get('motivo','reason','causa','cause','motivo_cancelamento','motivocancelamento') || 'Não informado').trim();
+    const descricao = String(get('descricao','descr','desc','justificativa','obs','observacao','detalhe','detalhes') || '').trim();
+
+    if (!rawData) return; // linha sem data, pula
+
+    // Normaliza data
+    let dataStr = '';
+    if (rawData instanceof Date) {
+      dataStr = `${rawData.getFullYear()}-${String(rawData.getMonth()+1).padStart(2,'0')}-${String(rawData.getDate()).padStart(2,'0')}`;
+    } else if (typeof rawData === 'number') {
+      dataStr = excelSerialToDate(rawData);
+    } else {
+      dataStr = normalizeDate(String(rawData));
+    }
+    if (!dataStr) return;
+
+    // Normaliza equipe
+    const equipeRaw = String(rawEquipe || '').trim().toUpperCase();
+    const teamMatch = TEAMS.find(t =>
+      equipeRaw === t.id ||
+      equipeRaw.includes(t.id) ||
+      t.id.includes(equipeRaw) ||
+      equipeRaw.replace(/\D/g,'') === t.id.replace(/\D/g,'')
+    );
+    const equipeId = teamMatch ? teamMatch.id : (equipeRaw || 'N/A');
+
+    const mesNum = parseInt(dataStr.slice(5,7)) || 0;
+    const valor  = parseValor(rawValor);
+
+    novos.push({ data: dataStr, mes: mesNum, equipe: equipeId, os, valor, tipo_servico: tipo, motivo, descricao });
+  });
+
+  cancelados = novos;
+  console.log(`parseCancelados: ${novos.length} registros carregados`, novos.slice(0,3));
+}
+
+function afterImport() {
+  setLastUpdate();
+  populateMonthFilters();
+  showPreview();
+  renderDashboard();
+  const currentPage = document.querySelector('.page.active')?.id?.replace('page-', '');
+  if (currentPage && currentPage !== 'dashboard' && currentPage !== 'importar') {
+    renderPage(currentPage);
+  }
+  // Garante que cancelados esteja pronto mesmo sem navegar até lá ainda
+  if (cancelados.length > 0 && currentPage !== 'cancelados') {
+    // pré-processa sem renderizar (apenas para filtros de mês)
+  }
+  setTimeout(injetarBotoesCaptura, 400);
+}
+
+// Converte serial numérico do Excel para string 'YYYY-MM-DD'
+function excelSerialToDate(serial) {
+  // Excel serial: dias desde 1900-01-00 (com bug do ano bissexto 1900)
+  const MS_PER_DAY = 86400000;
+  const EXCEL_EPOCH = new Date(Date.UTC(1899, 11, 31));
+  const d = new Date(EXCEL_EPOCH.getTime() + serial * MS_PER_DAY);
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(d.getUTCDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+// Parser principal para linhas vindas do Excel (sheet_to_json com raw:true)
+function parseExcelRows(rows) {
+  const newRecords = [];
+  const newJusts   = [];
+
+  rows.forEach(raw => {
+    // Normaliza chaves: lowercase, sem acento, underline
+    const row = {};
+    Object.keys(raw).forEach(k => {
+      const norm = k.toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .replace(/\s+/g, '_');
+      row[norm] = raw[k];
+    });
+
+    // ---- EQUIPE ----
+    const equipeRaw = String(row.equipe || row.team || row.equipe_id || '').trim();
+    const equipe = normalizeEquipe(equipeRaw);
+    if (!equipe) return;
+
+    // ---- DATA ----
+    let dataRaw = row.data || row.date;
+    let dataStr = '';
+
+    if (dataRaw instanceof Date) {
+      // cellDates:true retornou objeto Date
+      const y = dataRaw.getFullYear();
+      const m = String(dataRaw.getMonth() + 1).padStart(2, '0');
+      const d = String(dataRaw.getDate()).padStart(2, '0');
+      dataStr = `${y}-${m}-${d}`;
+    } else if (typeof dataRaw === 'number') {
+      // Serial numérico do Excel (raw:true)
+      dataStr = excelSerialToDate(dataRaw);
+    } else {
+      // String — pode vir em vários formatos
+      dataStr = normalizeDate(String(dataRaw || '').trim());
+    }
+
+    if (!dataStr || dataStr === 'Invalid Date') return;
+
+    // ---- MÊS ---- (sempre extraído da data normalizada)
+    const mesNum = parseInt(dataStr.split('-')[1]);
+    const mes = isNaN(mesNum) ? null : mesNum;
+    if (!mes) return;
+
+    // ---- OS ----
+    const osRaw = row.os !== undefined && row.os !== null ? row.os : (row.ordem_servico || row.ordem || '');
+    const os = String(osRaw).trim();
+
+    // ---- VALOR ----
+    const valorRaw = row.valor !== undefined ? row.valor : (row.value || 0);
+    const valor = parseValor(valorRaw);
+
+    // ---- TIPO SERVIÇO ----
+    const tipoServico = String(row.tipo_servico || row.tipo || '').trim();
+
+    // ---- DIAS SEM PRODUÇÃO ----
+    const diasSem = parseInt(row.dias_sem_prod || row.dias_parado || 0) || 0;
+
+    // ---- JUSTIFICATIVA ----
+    const justif = String(row.justificativa || row.motivo || '').trim();
+
+    const isFolga = tipoServico.trim().toUpperCase() === 'F' || tipoServico.trim().toUpperCase() === 'FOLGA';
+
+    if (isFolga || os || valor > 0) {
+      newRecords.push({ data: dataStr, mes, equipe, os, valor, tipo_servico: tipoServico });
+    }
+    if (diasSem > 0 || justif) {
+      newJusts.push({
+        data: dataStr, mes, equipe,
+        motivo: justif ? categorizarMotivo(justif) : 'Outros',
+        descricao: justif
+      });
+    }
+  });
+
+  records        = [...records, ...newRecords];
+  justificativas = [...justificativas, ...newJusts];
+  const mesesDetect = [...new Set(newRecords.map(r=>r.mes).filter(Boolean))].sort((a,b)=>a-b).map(m=>MONTHS_FULL[m-1]).join(', ');
+  alert(`✅ Importado com sucesso!\n${newRecords.length} registros de produção\n${newJusts.length} justificativas\nMeses detectados: ${mesesDetect||'nenhum'}`);
+}
+
+function parseCSV(text) {
+  // Corrige encoding UTF-8 mal interpretado (ex: ServiÃ§os → Serviços)
+  try {
+    const bytes = new Uint8Array([...text].map(c => c.charCodeAt(0)));
+    const decoded = new TextDecoder('utf-8').decode(bytes);
+    if (!decoded.includes('�')) text = decoded;
+  } catch(e) {}
+
+  // Parser CSV robusto — usa csvParaRows que já lida com aspas e vírgulas
+  const rows = csvParaRows(text);
+  if (!rows.length) return;
+
+  const newRecords = [];
+  const newJusts   = [];
+
+  // Normaliza cabeçalhos
+  const normalizeKey = k => k.trim().toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/\s+/g,'_')
+    .replace(/[^a-z0-9_]/g,'');
+
+  rows.forEach(rawRow => {
+    const row = {};
+    Object.keys(rawRow).forEach(k => { row[normalizeKey(k)] = rawRow[k]; });
+
+    const equipe = normalizeEquipe(row.equipe || row.team || '');
+    if (!equipe) return;
+
+    const dataRaw  = row.data || row.date || '';
+    const dataStr  = normalizeDateGSheets(dataRaw);
+    if (!dataStr) return;
+
+    const mes          = parseInt(dataStr.split('-')[1]);
+    const valor        = parseValor(row.valor || row.value || '0');
+    const os           = row.os || row.ordem_servico || '';
+    const tipoServico  = row.tipo_servico || row.tipo || '';
+    const diasSem      = parseInt(row.dias_sem_prod || '0') || 0;
+    const justif       = row.justificativa || row.motivo || '';
+
+    const isFolga = ['F','FOLGA'].includes(tipoServico.trim().toUpperCase());
+    if (isFolga || os || valor > 0) {
+      newRecords.push({ data: dataStr, mes, equipe, os, valor, tipo_servico: tipoServico });
+    }
+    if (diasSem > 0 || justif) {
+      newJusts.push({ data: dataStr, mes, equipe, motivo: justif ? categorizarMotivo(justif) : 'Outros', descricao: justif });
+    }
+  });
+
+  records        = [...records, ...newRecords];
+  justificativas = [...justificativas, ...newJusts];
+}
+
+
+// ===========================
+//  EXPORTAR PDF
+// ===========================
+async function exportarPDF() {
+  const overlay = document.getElementById('pdfOverlay');
+  const fill    = document.getElementById('pdfProgressFill');
+  const step    = document.getElementById('pdfStep');
+
+  const setProgress = (pct, msg) => {
+    fill.style.width = pct + '%';
+    step.textContent = msg;
+  };
+
+  if (!window.jspdf || !window.html2canvas) {
+    alert('Bibliotecas PDF não carregadas. Verifique a conexão com a internet.');
+    return;
+  }
+
+  overlay.classList.add('active');
+  setProgress(3, 'Preparando...');
+  await new Promise(r => setTimeout(r, 100));
+
+  try {
+    const { jsPDF } = window.jspdf;
+
+    const paginas = [
+      { id: 'page-dashboard',      titulo: 'Dashboard Geral',      render: renderDashboard },
+      { id: 'page-faturamento',    titulo: 'Faturamento',          render: renderFaturamento },
+      { id: 'page-producao',       titulo: 'Producao',             render: renderProducao },
+      { id: 'page-equipes',        titulo: 'Equipes',              render: renderEquipes },
+      { id: 'page-justificativas', titulo: 'Justificativas',       render: renderJustificativas },
+      { id: 'page-cancelados',     titulo: 'Servicos Cancelados',  render: renderCancelados },
+    ];
+
+    const paginaAtiva = document.querySelector('.page.active')?.id;
+    const navAtivo    = document.querySelector('.nav-item.active');
+
+    const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+    const PW  = pdf.internal.pageSize.getWidth();
+    const PH  = pdf.internal.pageSize.getHeight();
+
+    const dataHoje = new Date().toLocaleString('pt-BR', {
+      day: '2-digit', month: '2-digit', year: 'numeric',
+      hour: '2-digit', minute: '2-digit'
+    });
+
+    for (let i = 0; i < paginas.length; i++) {
+      const { id, titulo, render } = paginas[i];
+      setProgress(5 + Math.round((i / paginas.length) * 85), `Capturando ${titulo} (${i+1}/${paginas.length})...`);
+
+      // Ativa e renderiza
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+      document.getElementById(id).classList.add('active');
+      render();
+      await new Promise(r => setTimeout(r, 1200));
+
+      const el = document.getElementById(id);
+
+      // Captura
+      const canvas = await html2canvas(el, {
+        backgroundColor: '#0a0d14',
+        scale: 1.5,
+        useCORS: true,
+        allowTaint: true,
+        logging: false,
+        scrollX: 0, scrollY: 0,
+        width:        el.scrollWidth,
+        height:       el.scrollHeight,
+        windowWidth:  el.scrollWidth,
+        windowHeight: el.scrollHeight,
+        onclone: (cloneDoc) => {
+          cloneDoc.body.style.background = '#0a0d14';
+          cloneDoc.body.style.margin = '0';
+          const cloneEl = cloneDoc.getElementById(id);
+          if (!cloneEl) return;
+          cloneEl.style.display = 'block';
+          cloneEl.style.height  = 'auto';
+          cloneEl.querySelectorAll('*').forEach(node => {
+            node.style.overflow  = 'visible';
+            node.style.maxHeight = 'none';
+          });
+        }
+      });
+
+      // Aplica fundo escuro antes de converter
+      const fc = document.createElement('canvas');
+      fc.width  = canvas.width;
+      fc.height = canvas.height;
+      const fCtx = fc.getContext('2d');
+      fCtx.fillStyle = '#0a0d14';
+      fCtx.fillRect(0, 0, fc.width, fc.height);
+      fCtx.drawImage(canvas, 0, 0);
+      const imgData = fc.toDataURL('image/jpeg', 0.88);
+
+      if (i > 0) pdf.addPage();
+
+      // Fundo página
+      pdf.setFillColor(10, 13, 20);
+      pdf.rect(0, 0, PW, PH, 'F');
+
+      // Cabecalho
+      const HDR = 10;
+      pdf.setFillColor(15, 19, 30);
+      pdf.rect(0, 0, PW, HDR, 'F');
+      pdf.setDrawColor(0, 212, 255); pdf.setLineWidth(0.5);
+      pdf.line(0, HDR, PW, HDR);
+      pdf.setFont('helvetica', 'bold'); pdf.setFontSize(7); pdf.setTextColor(0, 212, 255);
+      pdf.text('LINHA VIVA', 6, 7);
+      pdf.setTextColor(220, 225, 240); pdf.setFontSize(9);
+      pdf.text(titulo.toUpperCase(), PW / 2, 7, { align: 'center' });
+      pdf.setFont('helvetica', 'normal'); pdf.setFontSize(7); pdf.setTextColor(80, 90, 120);
+      pdf.text(dataHoje, PW - 6, 7, { align: 'right' });
+
+      // Imagem
+      const MAR = 3, FTR = 6;
+      const maxW = PW - MAR * 2;
+      const maxH = PH - HDR - FTR - 2;
+      const ratio = Math.min(maxW / canvas.width, maxH / canvas.height);
+      const drawW = canvas.width  * ratio;
+      const drawH = canvas.height * ratio;
+      const offX  = MAR + (maxW - drawW) / 2;
+      pdf.addImage(imgData, 'JPEG', offX, HDR + 1, drawW, drawH);
+
+      // Rodape
+      pdf.setFillColor(15, 19, 30);
+      pdf.rect(0, PH - FTR, PW, FTR, 'F');
+      pdf.setDrawColor(30, 40, 64); pdf.setLineWidth(0.3);
+      pdf.line(0, PH - FTR, PW, PH - FTR);
+      pdf.setFont('helvetica', 'normal'); pdf.setFontSize(6.5); pdf.setTextColor(80, 90, 120);
+      pdf.text('Gerado automaticamente - Dashboard Linha Viva', 6, PH - 1.8);
+      pdf.text('Pagina ' + (i + 1) + ' de ' + paginas.length, PW - 6, PH - 1.8, { align: 'right' });
+    }
+
+    setProgress(93, 'Salvando arquivo...');
+    await new Promise(r => setTimeout(r, 200));
+
+    // Restaura navegacao
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    if (paginaAtiva) document.getElementById(paginaAtiva)?.classList.add('active');
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    if (navAtivo) navAtivo.classList.add('active');
+    const nomePagina = paginaAtiva?.replace('page-', '');
+    if (nomePagina) renderPage(nomePagina);
+
+    const dataArq = new Date().toISOString().slice(0, 10);
+    pdf.save('relatorio-linha-viva-' + dataArq + '.pdf');
+
+    setProgress(100, 'PDF gerado com sucesso!');
+    await new Promise(r => setTimeout(r, 1200));
+
+  } catch (err) {
+    console.error('Erro ao gerar PDF:', err);
+    step.textContent = 'Erro ao gerar PDF: ' + err.message;
+    await new Promise(r => setTimeout(r, 3000));
+  } finally {
+    overlay.classList.remove('active');
+    fill.style.width = '0%';
+  }
+}
+// ===========================
+// ===========================
+//  CAPTURA DE ELEMENTO (PRINT/PNG)
+// ===========================
+async function capturarElemento(btn) {
+  if (!window.html2canvas) { alert('html2canvas não carregado.'); return; }
+
+  // Sobe para o card pai mais próximo
+  const card = btn.closest('.chart-card, .tabela-diaria-wrap, .section-card');
+  if (!card) return;
+
+  // Garante que o card tenha um ID único para o onclone encontrá-lo
+  if (!card.id) card.id = 'capture-' + Date.now();
+  const cardId = card.id;
+
+  btn.textContent = '⏳';
+  btn.classList.remove('ok');
+
+  try {
+    const canvas = await html2canvas(card, {
+      backgroundColor: '#111520',
+      scale: 2,
+      useCORS: true,
+      allowTaint: true,
+      logging: false,
+      scrollX: 0,
+      scrollY: 0,
+      width:  card.scrollWidth,
+      height: card.scrollHeight,
+      onclone: (doc) => {
+        // Esconde todos os botões de captura no clone
+        doc.querySelectorAll('.btn-capture').forEach(b => b.style.display = 'none');
+        doc.body.style.background = '#0a0d14';
+        // Expande o card clonado para mostrar conteúdo completo
+        const el = doc.getElementById(cardId);
+        if (el) {
+          el.style.overflow  = 'visible';
+          el.style.height    = 'auto';
+          el.style.maxHeight = 'none';
+          el.querySelectorAll('*').forEach(child => {
+            child.style.maxHeight = 'none';
+          });
+        }
+      }
+    });
+
+    // Nome do arquivo baseado no título do card
+    const titulo = card.querySelector('.section-title')?.textContent?.trim()?.slice(0, 30) || 'captura';
+    const nome   = titulo.toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+    const data   = new Date().toISOString().slice(0, 10);
+
+    const link      = document.createElement('a');
+    link.download   = `lv-${nome}-${data}.png`;
+    link.href       = canvas.toDataURL('image/png');
+    link.click();
+
+    btn.textContent = '✅';
+    btn.classList.add('ok');
+    setTimeout(() => { btn.textContent = '📷'; btn.classList.remove('ok'); }, 2000);
+
+  } catch(e) {
+    console.error('Erro ao capturar:', e);
+    btn.textContent = '❌';
+    setTimeout(() => { btn.textContent = '📷'; }, 2000);
+  }
+}
+
+function injetarBotoesCaptura() {
+  document.querySelectorAll('.section-header, .table-header').forEach(header => {
+    if (header.querySelector('.btn-capture')) return;
+    header.style.display        = 'flex';
+    header.style.alignItems     = 'center';
+    header.style.justifyContent = 'space-between';
+    const btn       = document.createElement('button');
+    btn.className   = 'btn-capture';
+    btn.textContent = '📷';
+    btn.title       = 'Salvar imagem PNG';
+    btn.onclick     = () => capturarElemento(btn);
+    header.appendChild(btn);
+  });
+}
+
+// Popula todos os <select> de filtro de mês com base nos meses presentes nos dados
+function populateMonthFilters() {
+  const mesesPresentes = [...new Set([
+    ...records.map(r => r.mes),
+    ...cancelados.map(c => c.mes)
+  ].filter(Boolean))].sort((a,b)=>a-b);
+  const selectIds = ['filtroMes','filtroMesProd','filtroMesEquipes','filtroMesJust','filtroMesDash','filtroMesCanel'];
+  selectIds.forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const current = el.value;
+    el.innerHTML = '<option value="todos">Todos os meses</option>';
+    mesesPresentes.forEach(m => {
+      const opt = document.createElement('option');
+      opt.value = m;
+      opt.textContent = MONTHS_FULL[m-1];
+      el.appendChild(opt);
+    });
+    // Mantém seleção anterior se ainda válida
+    if ([...el.options].some(o => o.value === current)) el.value = current;
+  });
+}
+
+// Helper: retorna records filtrados pelo mês do select informado
+function filteredRecords(selectId) {
+  const mes = document.getElementById(selectId)?.value;
+  if (!mes || mes === 'todos') return records;
+  return records.filter(r => String(r.mes) === String(mes));
+}
+function filteredJusts(selectId) {
+  const mes = document.getElementById(selectId)?.value;
+  if (!mes || mes === 'todos') return justificativas;
+  return justificativas.filter(r => String(r.mes) === String(mes));
+}
+
+function normalizeEquipe(str) {
+  str = str.toUpperCase();
+  if (str.includes('01') || str.includes('JUCIER')) return 'LV-01';
+  if (str.includes('02') || str.includes('MAURO')) return 'LV-02';
+  if (str.includes('03') || str.includes('GLEIDSON') || str.includes('GLEISOM')) return 'LV-03';
+  if (str.includes('04') || str.includes('MARCOS') || str.includes('PINTO')) return 'LV-04';
+  if (str.includes('LV-')) return str.slice(0,5);
+  return null;
+}
+
+// Normaliza data vinda do Google Sheets — formato M/D/YYYY (americano)
+// Ex: 2/1/2026 → 2026-02-01
+function normalizeDateGSheets(str) {
+  if (!str || str === 'null' || str === 'undefined') return '';
+  str = str.trim();
+
+  // YYYY-MM-DD já ok
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+
+  // M/D/YYYY ou MM/DD/YYYY — formato americano do Google Sheets
+  const mx = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (mx) {
+    const mes = parseInt(mx[1]);
+    const dia = parseInt(mx[2]);
+    const ano = mx[3];
+    // Valida: mês entre 1-12, dia entre 1-31
+    if (mes >= 1 && mes <= 12 && dia >= 1 && dia <= 31) {
+      return `${ano}-${String(mes).padStart(2,'0')}-${String(dia).padStart(2,'0')}`;
+    }
+  }
+
+  // Fallback para normalizeDate padrão
+  return normalizeDate(str);
+}
+
+function normalizeDate(str) {
+  if (!str || str === 'null' || str === 'undefined') return '';
+  str = str.trim();
+
+  // YYYY-MM-DD (já ok)
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+
+  // DD/MM/YYYY ou M/D/YYYY (detecta automaticamente pelo valor dos campos)
+  const mx = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (mx) {
+    const a = parseInt(mx[1]), b = parseInt(mx[2]);
+    // Se o primeiro número > 12, certamente é dia (DD/MM/YYYY)
+    // Se o segundo > 12, o primeiro é mês (MM/DD/YYYY)
+    // Padrão brasileiro: interpretar como DD/MM/YYYY
+    if (b > 12) {
+      // M/DD/YYYY → impossível ser mês no segundo campo, então: MM/DD/YYYY
+      return `${mx[3]}-${mx[1].padStart(2,'0')}-${mx[2].padStart(2,'0')}`;
+    }
+    // Assume DD/MM/YYYY (padrão BR)
+    return `${mx[3]}-${mx[2].padStart(2,'0')}-${mx[1].padStart(2,'0')}`;
+  }
+
+  // DD-MM-YYYY
+  const m3 = str.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+  if (m3) return `${m3[3]}-${m3[2].padStart(2,'0')}-${m3[1].padStart(2,'0')}`;
+
+  // Tenta via Date nativo (último recurso)
+  try {
+    const d = new Date(str);
+    if (!isNaN(d.getTime())) {
+      return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    }
+  } catch(e) {}
+
+  return '';
+}
+
+// Converte qualquer formato de valor monetário para número
+// Aceita: 1234.56 | 1.234,56 | R$ 1.234,56 | R$1234,56 | "1,234.56"
+function parseValor(raw) {
+  if (raw === null || raw === undefined || raw === '') return 0;
+  if (typeof raw === 'number') return raw;
+  let s = String(raw).trim();
+  // Remove símbolo de moeda e espaços
+  s = s.replace(/R\$\s*/gi, '').trim();
+  // Detecta formato: se tem ponto E vírgula, o último separador é o decimal
+  const temPonto  = s.includes('.');
+  const temVirgula = s.includes(',');
+  if (temPonto && temVirgula) {
+    // Ex: 1.234,56 (BR) ou 1,234.56 (EN)
+    const ultPonto   = s.lastIndexOf('.');
+    const ultVirgula = s.lastIndexOf(',');
+    if (ultVirgula > ultPonto) {
+      // BR: 1.234,56 → remove pontos, troca vírgula por ponto
+      s = s.replace(/\./g, '').replace(',', '.');
+    } else {
+      // EN: 1,234.56 → remove vírgulas
+      s = s.replace(/,/g, '');
+    }
+  } else if (temVirgula) {
+    // Só vírgula: pode ser milhar (1,234) ou decimal (1,56)
+    const partes = s.split(',');
+    if (partes.length === 2 && partes[1].length <= 2) {
+      // Decimal: 1234,56
+      s = s.replace(',', '.');
+    } else {
+      // Milhar: 1,234,567 → remove vírgulas
+      s = s.replace(/,/g, '');
+    }
+  }
+  // Remove qualquer caractere não numérico restante (exceto ponto e sinal)
+  s = s.replace(/[^\d.-]/g, '');
+  return parseFloat(s) || 0;
+}
+
+function parseDate(str) {
+  if (!str) return null;
+  try {
+    const d = new Date(str + 'T00:00:00');
+    return isNaN(d.getTime()) ? null : d;
+  } catch { return null; }
+}
+
+function categorizarMotivo(texto) {
+  const t = texto.toLowerCase();
+  if (t.includes('chuv') || t.includes('tempo') || t.includes('clima') || t.includes('vento')) return 'Clima';
+  if (t.includes('equip') || t.includes('maquina') || t.includes('veículo') || t.includes('veiculo')) return 'Equipamento';
+  if (t.includes('material') || t.includes('peça') || t.includes('peca') || t.includes('estoque')) return 'Falta de Material';
+  if (t.includes('manutenção') || t.includes('manutencao') || t.includes('reparo')) return 'Manutenção';
+  if (t.includes('sem os') || t.includes('sem ordem') || t.includes('sem serviço')) return 'Sem OS';
+  if (t.includes('falta') || t.includes('atestado') || t.includes('afasta') || t.includes('licen') || t.includes('médico') || t.includes('medico') || t.includes('doença') || t.includes('doenca')) return 'Falta/Atestado';
+  return 'Outros';
+}
+
+function showPreview() {
+  const div = document.getElementById('importPreview');
+  const tbody = document.getElementById('importPreviewBody');
+  div.style.display = 'block';
+  tbody.innerHTML = records.slice(-20).reverse().map(r => `
+    <tr>
+      <td>${formatDateBR(r.data)}</td>
+      <td>${r.equipe}</td>
+      <td>${r.os}</td>
+      <td>R$ ${fmt(r.valor)}</td>
+      <td>${r.tipo_servico}</td>
+      <td>—</td>
+      <td>—</td>
+    </tr>`).join('');
+}
+
+function loadDemoData() {
+  records = [];
+  justificativas = [];
+  const tipos = ['Manutenção Rede','Instalação','Emergência','Inspeção','Desligamento Programado','Modernização'];
+  const motivos = ['Chuva forte impediu operação','Falha no veículo','Falta de material isolante','Aguardando OS programada','Manutenção preventiva na frota','Condições climáticas adversas'];
+
+  let osNum = 1000;
+  for (let mes = 0; mes < 12; mes++) {
+    TEAMS.forEach(t => {
+      const diasTrab = Math.floor(Math.random()*5) + 17;
+      const diasPar = Math.floor(Math.random()*4);
+      for (let d = 0; d < diasTrab; d++) {
+        const dia = Math.floor(Math.random()*27) + 1;
+        const date = `2025-${String(mes+1).padStart(2,'0')}-${String(dia).padStart(2,'0')}`;
+        const base = { 'LV-01': 14000, 'LV-02': 11000, 'LV-03': 9500, 'LV-04': 12500 }[t.id];
+        const valor = base * (0.6 + Math.random()*0.8) / diasTrab * (1 + d/diasTrab*0.3);
+        records.push({ data: date, mes: mes+1, equipe: t.id, os: `OS-${++osNum}`, valor: Math.round(valor * 100)/100, tipo_servico: tipos[Math.floor(Math.random()*tipos.length)] });
+      }
+      for (let d = 0; d < diasPar; d++) {
+        const dia = Math.floor(Math.random()*27) + 1;
+        const date = `2025-${String(mes+1).padStart(2,'0')}-${String(dia).padStart(2,'0')}`;
+        justificativas.push({ data: date, mes: mes+1, equipe: t.id, motivo: categorizarMotivo(motivos[Math.floor(Math.random()*motivos.length)]), descricao: motivos[Math.floor(Math.random()*motivos.length)] });
+      }
+    });
+  }
+  alert(`✅ Dados de demonstração carregados!\n${records.length} registros | ${justificativas.length} justificativas`);
+  setLastUpdate();
+  populateMonthFilters();
+  showPreview();
+  renderDashboard();
+  const currentPage = document.querySelector('.page.active')?.id?.replace('page-', '');
+  if (currentPage && currentPage !== 'dashboard' && currentPage !== 'importar') renderPage(currentPage);
+}
+
+function clearData() {
+  if (!confirm('Limpar todos os dados?')) return;
+  records = []; justificativas = []; cancelados = [];
+  document.getElementById('importPreview').style.display = 'none';
+  document.getElementById('sheetSelector').style.display = 'none';
+  renderDashboard();
+}
+
+function downloadTemplate() {
+  const csv = `data,equipe,valor,tipo_servico,dias_sem_prod,justificativa\n01/01/2025,LV-01,12500.00,Manutenção Rede,0,\n02/01/2025,LV-02,8750.50,Instalação,0,\n03/01/2025,LV-03,0,,,Chuva forte impediu operação\n04/01/2025,LV-04,15200.00,Emergência,0,\n`;
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'template-linha-viva.csv';
+  a.click();
+}
+
+// ===========================
+//  MODALS
+// ===========================
+function openEntryModal() {
+  document.getElementById('entryData').value = new Date().toISOString().slice(0,10);
+  document.getElementById('entryModal').classList.add('open');
+}
+function openJustModal() {
+  document.getElementById('justData').value = new Date().toISOString().slice(0,10);
+  document.getElementById('justModal').classList.add('open');
+}
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+function saveEntry() {
+  const data    = document.getElementById('entryData').value;
+  const equipe  = document.getElementById('entryEquipe').value;
+  const os      = document.getElementById('entryOS').value;
+  const valor   = parseFloat(document.getElementById('entryValor').value)||0;
+  const tipo    = document.getElementById('entryTipo').value;
+  if (!data || !equipe) { alert('Preencha data e equipe'); return; }
+  records.push({ data, equipe, os, valor, tipo_servico: tipo });
+  closeModal('entryModal');
+  setLastUpdate();
+  renderDashboard();
+  alert('✅ Lançamento salvo!');
+}
+
+function saveJustificativa() {
+  const data     = document.getElementById('justData').value;
+  const equipe   = document.getElementById('justEquipe').value;
+  const motivo   = document.getElementById('justMotivo').value;
+  const descricao = document.getElementById('justDescricao').value;
+  if (!data || !equipe) { alert('Preencha data e equipe'); return; }
+  justificativas.push({ data, equipe, motivo, descricao });
+  closeModal('justModal');
+  renderJustificativas();
+  alert('✅ Justificativa salva!');
+}
+
+// Close modal on overlay click
+document.querySelectorAll('.modal-overlay').forEach(m => {
+  m.addEventListener('click', e => { if (e.target === m) m.classList.remove('open'); });
+});
+
+// ===========================
+//  FORMATTERS
+// ===========================
+function fmt(v) {
+  return Number(v||0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+function fmtShort(v) {
+  if (v >= 1000000) return (v/1000000).toFixed(1) + 'M';
+  if (v >= 1000) return (v/1000).toFixed(0) + 'k';
+  return v.toFixed(0);
+}
+function formatDateBR(str) {
+  if (!str) return '—';
+  const parts = str.split('-');
+  if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  return str;
+}
+
+// ===========================
+//  INIT
+// ===========================
+function init() {
+  const now = new Date();
+  document.getElementById('pageDate').textContent = now.toLocaleDateString('pt-BR', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+  renderDashboard();
+  setTimeout(injetarBotoesCaptura, 500);
+}
+
+init();
+</script>
+</body>
+</html>
