@@ -1825,21 +1825,31 @@ function renderTabelaDiaria(filtered, filtJust, teamsFiltered) {
     return;
   }
 
-  // Descobre intervalo de datas dos registros filtrados
-  const todasDatas = [...filtered.map(r => r.data), ...filtJust.map(j => j.data)];
-  const datasUnicas = [...new Set(todasDatas)].sort();
-  if (datasUnicas.length === 0) return;
+  // Determina o mês a exibir com base no filtro selecionado
+  const filtroMesVal = document.getElementById('filtroMesProd')?.value || 'todos';
 
-  // Pega o mês/ano a partir da primeira data
-  const primeiraData = parseDate(datasUnicas[0]);
-  const ultimaData   = parseDate(datasUnicas[datasUnicas.length - 1]);
-  const anoRef  = primeiraData.getFullYear();
-  const mesRef  = primeiraData.getMonth(); // 0-based
+  let anoRef, mesRef; // mesRef = 0-based
 
-  // Gera todos os dias do mês (ou intervalo se multi-mês)
+  if (filtroMesVal !== 'todos') {
+    // Mês específico selecionado — usa ele diretamente
+    const mesNum = parseInt(filtroMesVal); // 1-based
+    // Pega o ano a partir dos dados filtrados
+    const datasF = filtered.map(r => r.data).sort();
+    const anoDetect = datasF.length > 0 ? parseInt(datasF[0].slice(0,4)) : new Date().getFullYear();
+    anoRef = anoDetect;
+    mesRef = mesNum - 1; // converte para 0-based
+  } else {
+    // "Todos os meses" — exibe o mês mais recente dos dados
+    const todasDatas = [...filtered.map(r => r.data), ...filtJust.map(j => j.data)].sort();
+    const ultimaData = parseDate(todasDatas[todasDatas.length - 1]);
+    anoRef = ultimaData.getFullYear();
+    mesRef = ultimaData.getMonth();
+  }
+
+  // Gera todos os dias do mês selecionado
   const mesInicio = new Date(anoRef, mesRef, 1);
-  const mesFim    = new Date(ultimaData.getFullYear(), ultimaData.getMonth() + 1, 0);
-  const totalDias = Math.round((mesFim - mesInicio) / 86400000) + 1;
+  const mesFim    = new Date(anoRef, mesRef + 1, 0); // último dia do mês
+  const totalDias = mesFim.getDate();
 
   subtitle.textContent = `${MONTHS_FULL[mesRef]} ${anoRef} — valores executados por equipe`;
 
@@ -2508,51 +2518,50 @@ const GSHEETS_URLS = {
 
 // Proxies CORS em ordem de tentativa
 const CORS_PROXIES = [
-  'https://api.allorigins.win/raw?url=',
-  'https://corsproxy.io/?',
-  'https://cors-anywhere.herokuapp.com/',
+  url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+  url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+  url => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
+  url => `https://thingproxy.freeboard.io/fetch/${url}`,
 ];
 
 async function fetchCSV(url) {
-  // Converte URL de publicação para URL de exportação direta
   const urlExport = url
     .replace('/pub?', '/export?format=csv&')
     .replace('&output=csv', '')
     .replace('&single=true', '');
 
-  const tentativas = [url, urlExport];
+  const urls = [url, urlExport];
 
-  // Helper para ler resposta forçando UTF-8
   const lerUTF8 = async (resp) => {
     const buffer = await resp.arrayBuffer();
     return new TextDecoder('utf-8').decode(buffer);
   };
 
+  const isValido = txt => txt && txt.trim().length > 10 && !txt.trim().startsWith('<') && !txt.trim().startsWith('{');
+
   // 1) Tenta direto (funciona no Vercel publicado)
-  for (const u of tentativas) {
+  for (const u of urls) {
     try {
       const r = await fetch(u, { cache: 'no-store' });
       if (r.ok) {
         const txt = await lerUTF8(r);
-        if (txt && txt.trim().length > 10 && !txt.trim().startsWith('<')) return txt;
+        if (isValido(txt)) { console.log('✅ Fetch direto OK'); return txt; }
       }
     } catch(e) {}
   }
   console.warn('Fetch direto falhou, tentando proxies...');
 
   // 2) Tenta cada proxy
-  for (const proxy of CORS_PROXIES) {
-    for (const u of tentativas) {
+  for (const proxyFn of CORS_PROXIES) {
+    for (const u of urls) {
       try {
-        const r = await fetch(proxy + encodeURIComponent(u), { cache: 'no-store' });
+        const proxyUrl = proxyFn(u);
+        const r = await fetch(proxyUrl, { cache: 'no-store' });
         if (r.ok) {
           const txt = await lerUTF8(r);
-          if (txt && txt.trim().length > 10 && !txt.trim().startsWith('<')) {
-            console.log('✅ Proxy funcionou:', proxy);
-            return txt;
-          }
+          if (isValido(txt)) { console.log('✅ Proxy OK:', proxyUrl.slice(0,40)); return txt; }
         }
-      } catch(e) { console.warn('Proxy falhou:', proxy, e.message); }
+      } catch(e) { console.warn('Proxy falhou:', e.message); }
     }
   }
 
