@@ -2958,8 +2958,8 @@ function parseExcelRows(rows) {
     }
   });
 
-  records        = [...records, ...newRecords];
-  justificativas = [...justificativas, ...newJusts];
+  records        = newRecords;
+  justificativas = newJusts;
   const mesesDetect = [...new Set(newRecords.map(r=>r.mes).filter(Boolean))].sort((a,b)=>a-b).map(m=>MONTHS_FULL[m-1]).join(', ');
   alert(`✅ Importado com sucesso!\n${newRecords.length} registros de produção\n${newJusts.length} justificativas\nMeses detectados: ${mesesDetect||'nenhum'}`);
 }
@@ -3012,8 +3012,8 @@ function parseCSV(text) {
     }
   });
 
-  records        = [...records, ...newRecords];
-  justificativas = [...justificativas, ...newJusts];
+  records        = newRecords;
+  justificativas = newJusts;
 }
 
 
