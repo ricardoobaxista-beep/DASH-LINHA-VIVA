@@ -2184,7 +2184,6 @@ function renderEquipes() {
   const filtJust = filteredJusts('filtroMesEquipes');
   const mes = document.getElementById('filtroMesEquipes')?.value || 'todos';
 
-  // Se não há dados, mostrar estado vazio
   if (filtered.length === 0 && filtJust.length === 0) {
     const kpiDiv = document.getElementById('equipes-kpi');
     kpiDiv.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:60px 20px;color:var(--muted)">
@@ -2196,28 +2195,62 @@ function renderEquipes() {
     return;
   }
 
-  const periodoLabel = mes === 'todos'
-    ? 'Todos os meses'
-    : MONTHS_FULL[parseInt(mes)-1];
+  const periodoLabel = mes === 'todos' ? 'Todos os meses' : MONTHS_FULL[parseInt(mes)-1];
+
+  // Meta mensal fixa por equipe
+  const META_MENSAL_EQUIPE = {
+    'LV-01': 100000,
+    'LV-02': 100000,
+    'LV-03': 60000,
+    'LV-04': 60000,
+  };
+
+  function diasNoMes(ano, mes1based) {
+    return new Date(ano, mes1based, 0).getDate();
+  }
+
+  const anosNoDado = [...new Set(filtered.map(r => r.data ? r.data.slice(0,4) : null).filter(Boolean))];
+  const anoRef = anosNoDado.length > 0 ? parseInt(anosNoDado[0]) : new Date().getFullYear();
 
   const kpiDiv = document.getElementById('equipes-kpi');
   kpiDiv.innerHTML = TEAMS.map(t => {
-    const recs    = filtered.filter(r => r.equipe === t.id && !['F','FOLGA'].includes(String(r.tipo_servico||'').trim().toUpperCase()));
-    const fat     = recs.reduce((s,r)=>s+r.valor,0);
-    const os      = recs.filter(r=>isOSValida(r.os)).length;
-    // Dias trabalhados = dias distintos com valor > 0
-    const diasTrab    = new Set(recs.filter(r => r.valor > 0).map(r=>r.data));
-    // Dias parados = justificativas da equipe (atestados, chuva, etc.)
-    const diasParados = new Set(filtJust.filter(j=>j.equipe===t.id).map(j=>j.data));
-    // Meta = soma da metaDiaria de cada dia individualmente (suporta mudança de meta por período)
-    const diasBase    = new Set([...diasTrab, ...diasParados]);
-    let metaAcum = 0;
-    diasBase.forEach(data => { metaAcum += getMetaDiaria(t.id, data); });
-    const dias    = diasTrab.size;
-    const parados = diasParados.size;
-    const perf       = metaAcum > 0 ? Math.min(120, Math.round((fat/metaAcum)*100)) : 0;
-    const perfColor  = perf >= 100 ? 'var(--accent3)' : perf >= 75 ? 'var(--accent4)' : 'var(--accent2)';
-    const metaDiariaAtual = getMetaDiaria(t.id, new Date().toISOString().slice(0,10));
+    const META_MENSAL = META_MENSAL_EQUIPE[t.id] || 110000;
+    const FOLGA = ['F','FOLGA'];
+
+    const todosRecs = records.filter(r => {
+      if (r.equipe !== t.id) return false;
+      if (mes === 'todos') return true;
+      return r.mes === parseInt(mes);
+    });
+
+    const diasFolga = new Set(
+      todosRecs.filter(r => FOLGA.includes(String(r.tipo_servico||'').trim().toUpperCase())).map(r => r.data)
+    );
+
+    const recs        = todosRecs.filter(r => !FOLGA.includes(String(r.tipo_servico||'').trim().toUpperCase()));
+    const fat         = recs.reduce((s,r) => s + r.valor, 0);
+    const os          = recs.filter(r => isOSValida(r.os)).length;
+    const diasTrab    = new Set(recs.filter(r => r.valor > 0).map(r => r.data));
+    const diasParados = new Set(filtJust.filter(j => j.equipe === t.id).map(j => j.data));
+
+    let totalDiasMes = 0;
+    if (mes === 'todos') {
+      const mesesPresentes = [...new Set(todosRecs.map(r => r.mes).filter(Boolean))];
+      mesesPresentes.forEach(m => { totalDiasMes += diasNoMes(anoRef, m); });
+      if (totalDiasMes === 0) totalDiasMes = new Date().getDate();
+    } else {
+      totalDiasMes = diasNoMes(anoRef, parseInt(mes));
+    }
+
+    const diasQueTrabalha = Math.max(1, totalDiasMes - diasFolga.size);
+    const metaDiaria = META_MENSAL / diasQueTrabalha;
+    const metaAcum   = META_MENSAL;
+    const dias        = diasTrab.size;
+    const parados     = diasParados.size;
+    const perf        = metaAcum > 0 ? Math.min(120, Math.round((fat / metaAcum) * 100)) : 0;
+    const perfColor   = perf >= 100 ? 'var(--accent3)' : perf >= 75 ? 'var(--accent4)' : 'var(--accent2)';
+    const formulaLabel = `<span style="font-size:9px;color:var(--muted);font-family:'JetBrains Mono',monospace"> (R$${fmtShort(META_MENSAL)} ÷ ${diasQueTrabalha}d)</span>`;
+
     return `<div class="kpi-card">
       <div class="kpi-label">${t.name}</div>
       <div class="kpi-value" style="color:${t.color};font-size:22px">R$ ${fmt(fat)}</div>
@@ -2226,7 +2259,11 @@ function renderEquipes() {
         <div style="font-size:10px;color:${perfColor};text-align:right;margin-top:3px;font-family:'JetBrains Mono',monospace">${perf}% da meta — R$ ${fmt(metaAcum)}</div>
       </div>
       <div style="margin-top:10px;display:flex;flex-direction:column;gap:6px">
-        <div class="info-row"><span class="info-key">Meta Diária</span><span class="info-val" style="color:#ff6b35">R$ ${fmt(metaDiariaAtual)}</span></div>
+        <div class="info-row"><span class="info-key">Meta Mensal</span><span class="info-val" style="color:#ff6b35">R$ ${fmt(META_MENSAL)}</span></div>
+        <div class="info-row">
+          <span class="info-key">Meta Diária</span>
+          <span class="info-val" style="color:#00d4ff">R$ ${fmt(metaDiaria)}${formulaLabel}</span>
+        </div>
         <div class="info-row"><span class="info-key">OS Realizadas</span><span class="info-val">${os}</span></div>
         <div class="info-row"><span class="info-key">Dias Trabalhados</span><span class="info-val">${dias}</span></div>
         <div class="info-row"><span class="info-key">Dias Parados</span><span class="info-val" style="color:${parados>0?'var(--accent2)':'inherit'}">${parados}</span></div>
@@ -2251,12 +2288,12 @@ function renderEquipes() {
 
   setTimeout(() => {
     TEAMS.forEach(t => {
+      const META_MENSAL = META_MENSAL_EQUIPE[t.id] || 110000;
       const recs = filtered.filter(r => r.equipe === t.id && !['F','FOLGA'].includes(String(r.tipo_servico||'').trim().toUpperCase()));
       const folgasEquipe = new Set(
-        filtered.filter(r => r.equipe === t.id && ['F','FOLGA'].includes(String(r.tipo_servico||'').trim().toUpperCase()))
-                .map(r => r.data)
+        filtered.filter(r => r.equipe === t.id && ['F','FOLGA'].includes(String(r.tipo_servico||'').trim().toUpperCase())).map(r => r.data)
       );
-      const id   = `chartEquipe_${t.id.replace('-','_')}`;
+      const id  = `chartEquipe_${t.id.replace('-','_')}`;
       destroyChart(id);
       const ctx = document.getElementById(id)?.getContext('2d');
       if (!ctx) return;
@@ -2268,45 +2305,23 @@ function renderEquipes() {
           const d = parseDate(r.data);
           return d && d.getMonth() === i;
         }).reduce((s,r)=>s+r.valor,0));
-        // Meta mensal = metaDiaria × dias úteis reais daquele mês
-        metaData = MONTHS.map((_,i) => t.metaDiaria * calcularDiasUteisMes(t.id, i, records));
+        metaData = MONTHS.map((_,i) => (META_MENSAL / 22) * calcularDiasUteisMes(t.id, i, records));
       } else {
         const dailyMap = {};
         recs.forEach(r => { dailyMap[r.data] = (dailyMap[r.data]||0) + r.valor; });
         const days = Object.keys(dailyMap).sort();
         labels = days.map(d => formatDateBR(d));
         data   = days.map(d => dailyMap[d]);
-        // Meta diária = 0 em dias de folga, metaDiaria nos demais
-        metaData = days.map(day => folgasEquipe.has(day) ? 0 : t.metaDiaria);
+        metaData = days.map(day => folgasEquipe.has(day) ? 0 : META_MENSAL / 22);
       }
-
-      const metaLabel = isMensal ? 'Meta mensal' : 'Meta diária';
 
       charts[id] = new Chart(ctx, {
         type: 'line',
         data: {
           labels,
           datasets: [
-            {
-              label: 'Faturamento',
-              data,
-              borderColor: t.color,
-              backgroundColor: teamColor(t.id, 0.1),
-              fill: true,
-              tension: 0.4,
-              pointRadius: 4,
-              pointBackgroundColor: t.color
-            },
-            {
-              label: metaLabel,
-              data: metaData,
-              borderColor: 'rgba(255,204,0,0.7)',
-              borderWidth: 2,
-              borderDash: [6, 3],
-              pointRadius: 0,
-              fill: false,
-              tension: 0,
-            }
+            { label: 'Faturamento', data, borderColor: t.color, backgroundColor: teamColor(t.id, 0.1), fill: true, tension: 0.4, pointRadius: 4, pointBackgroundColor: t.color },
+            { label: isMensal ? 'Meta mensal' : 'Meta diária', data: metaData, borderColor: 'rgba(255,204,0,0.7)', borderWidth: 2, borderDash: [6,3], pointRadius: 0, fill: false, tension: 0 }
           ]
         },
         options: {
@@ -2324,6 +2339,7 @@ function renderEquipes() {
     });
   }, 100);
 }
+
 
 // ===========================
 //  CANCELADOS RENDER
